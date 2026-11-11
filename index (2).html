@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Couples Budget</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#eef3f1;--card:#fff;--ink:#14302b;--mut:#5d716c;--line:#d5e0dc;--acc:#0f766e;--pos:#16703a;--neg:#b3261e;--posbg:#e3f4ea;--negbg:#fbe6e4}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1917;--card:#16262a;--ink:#e6f1ee;--mut:#93a9a4;--line:#2a3f43;--acc:#4fd1c5;--pos:#6fdc9a;--neg:#ff8a80;--posbg:#173a2a;--negbg:#40201f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Figtree,system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 14px 60px}
+h1{font-size:28px;font-weight:800;margin:6px 0 4px}
+h3{font-size:17px;margin:18px 0 6px}
+.sub{color:var(--mut);margin:0 0 14px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.pad{padding:16px}
+.mh{display:flex;align-items:center;gap:10px;width:100%;font:inherit;font-size:19px;color:var(--ink);background:none;border:0;padding:16px;cursor:pointer;text-align:left}
+.mh .ar{color:var(--mut);width:16px}
+.mh .now{font-size:12px;font-weight:600;color:var(--acc);border:1px solid var(--acc);border-radius:999px;padding:1px 8px}
+.mh>span:last-child{margin-left:auto;font-size:16px}
+.mb{padding:0 16px 16px;border-top:1px solid var(--line)}
+table{width:100%;border-collapse:collapse}
+td{padding:4px;border-top:1px solid var(--line)}
+td.am{width:110px}
+td:last-child{text-align:right}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%;min-width:0}
+input[type=number]{text-align:right}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+td.nm .row{display:flex;flex-direction:column;gap:6px}
+td.nm select.ow{font-size:12px;padding:3px 6px;width:auto;align-self:flex-start;color:var(--mut)}
+.x{background:none;border:0;color:var(--mut);font-size:14px;cursor:pointer;padding:4px 6px;border-radius:8px}
+.x:hover{color:var(--neg)}
+tr.tot td{font-weight:600;border-top:2px solid var(--line);padding:10px 6px}
+tr.tot td:nth-child(2),tr.left td:nth-child(2){text-align:right}
+tr.left td{font-weight:800;padding:8px 6px}
+.pill{display:inline-block;padding:4px 10px;border-radius:999px;font-weight:800}
+.pos{background:var(--posbg);color:var(--pos)}.neg{background:var(--negbg);color:var(--neg)}
+button.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px;cursor:pointer}
+button.btn:hover{border-color:var(--acc);color:var(--acc)}
+button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.hint{color:var(--mut);font-size:14px;margin-top:10px}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.names label{font-size:13px;color:var(--mut)}
+#auth{max-width:380px;margin:8vh auto 0}
+#auth input{margin:6px 0 10px}
+#st{color:var(--mut);font-size:14px;margin-right:8px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<div id="auth" hidden>
+<h1>Couples Budget</h1>
+<p class="sub">Sign in to see your own budget, or create an account. Your budget is private to your login.</p>
+<div class="card pad">
+<label for="em">Email</label><input id="em" type="email" autocomplete="email" inputmode="email">
+<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
+<div class="bar" style="margin-top:4px">
+<button class="btn main" data-a="in">Sign in</button>
+<button class="btn" data-a="up">Create account</button>
+<button class="btn" data-a="fp">Forgot password</button>
+</div>
+<p class="hint" id="msg" role="status"></p>
+</div>
+</div>
+
+<div id="board" hidden>
+<div class="top"><h1>Our budget</h1><div><span id="st"></span><button class="btn" data-a="out">Sign out</button></div></div>
+<p class="sub" id="who"></p>
+<div class="card pad"><div class="names" id="names"></div></div>
+<div id="app"></div>
+<div class="bar">
+<button class="btn main" data-a="addm">Add next month</button>
+<button class="btn" data-a="delm">Remove last month</button>
+<button class="btn" data-a="reset">Start over</button>
+</div>
+<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Use ▲ ▼ to change the order and “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ===== 1. PASTE YOUR SUPABASE DETAILS HERE (see README) ===== */
+var SUPABASE_URL='https://itihmcfvwrhaudjvnsea.supabase.co';
+var SUPABASE_KEY='sb_publishable_tCk0kStAxNkw2MAvzsAMaA_z7NIG0zi';
+/* ============================================================ */
+
+var P=[0,1];
+var PRE=['Rent','Power','Food','Meat','Dog food','Wifi','House stuff','Worker','Car','Nails','Loan','Insurance','Fuel','Phone'];
+function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+var now=new Date(),CUR=ym(now);
+function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYear(),now.getMonth()+k,1))});
+return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],
+exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
+var S=fresh(),OPEN={},UID=null,T=null,sb=null;
+function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true}
+function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+function ML(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleString('en-ZA',{month:'short',year:'numeric'})}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function pill(n){return'<span class="pill '+(n<0?'neg':'pos')+'">'+R(n)+'</span>'}
+function $(id){return document.getElementById(id)}
+
+/* ---------- saving to the account ---------- */
+function status(t){$('st').textContent=t}
+function save(){if(!UID)return;status('Saving…');clearTimeout(T);T=setTimeout(push,700)}
+async function push(){var r=await sb.from('budgets').upsert({user_id:UID,data:S,updated_at:new Date().toISOString()});
+status(r.error?'Not saved – check your internet':'Saved ✓')}
+async function load(){var r=await sb.from('budgets').select('data').eq('user_id',UID).maybeSingle();
+if(r.data&&r.data.data&&r.data.data.months){S=r.data.data}else{S=fresh();if(!r.error)await push()}
+if(r.error)status('Could not load – check your internet');setOpen()}
+
+/* ---------- drawing the budget ---------- */
+function nameCell(e,ei,p){var cu=e.c||PRE.indexOf(e.n)<0;
+return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+PRE.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+n+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
+function person(p,i){
+var h='<h3>'+esc(S.names[p])+' pays</h3><table><tr><td><b>Salary</b></td><td class="am"><input type="number" inputmode="numeric" data-k="inc" data-p="'+p+'" data-i="'+i+'" value="'+S.inc[p][i]+'" aria-label="Salary"></td><td></td></tr>';
+S.exp.forEach(function(e,ei){if(e.o!==p)return;
+h+='<tr><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><button class="x" data-a="up" data-e="'+ei+'" aria-label="Move up" title="Move up">▲</button><button class="x" data-a="dn" data-e="'+ei+'" aria-label="Move down" title="Move down">▼</button><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
+h+='<tr class="tot"><td>Total bills</td><td id="t-'+p+'-'+i+'"></td><td></td></tr><tr class="left"><td>Left over</td><td id="l-'+p+'-'+i+'"></td><td></td></tr></table>';
+return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
+function month(m,i){var o=!!OPEN[i];
+return'<section class="card"><button class="mh" data-a="tog" data-i="'+i+'" aria-expanded="'+o+'"><span class="ar">'+(o?'▾':'▸')+'</span><b>'+ML(m)+'</b>'+(m===CUR?'<span class="now">This month</span>':'')+'<span id="ml-'+i+'"></span></button><div class="mb"'+(o?'':' hidden')+'>'+
+P.map(function(p){return person(p,i)}).join('')+
+'<h3>Together</h3><table>'+[['Income','ci'],['Bills','ce'],['Left over','cl'],['Saved so far','cs']].map(function(r){return'<tr class="'+(r[1]==='cl'?'left':'tot')+'"><td>'+r[0]+'</td><td id="'+r[1]+'-'+i+'"></td><td></td></tr>'}).join('')+'</table></div></section>'}
+function totals(){var run=0;
+S.months.forEach(function(m,i){var ci=0,ce=0;
+P.forEach(function(p){var inc=+S.inc[p][i]||0,t=0;
+S.exp.forEach(function(e){if(e.o===p)t+=+e.a[i]||0});
+ci+=inc;ce+=t;
+$('t-'+p+'-'+i).textContent=R(t);$('l-'+p+'-'+i).innerHTML=pill(inc-t)});
+run+=ci-ce;
+$('ci-'+i).textContent=R(ci);$('ce-'+i).textContent=R(ce);
+$('cl-'+i).innerHTML=pill(ci-ce);$('cs-'+i).textContent=R(run);$('ml-'+i).innerHTML=pill(ci-ce)})}
+function render(){
+$('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
+$('app').innerHTML=S.months.map(month).join('');totals()}
+
+/* ---------- typing and clicking ---------- */
+$('board').addEventListener('input',function(ev){var t=ev.target,k=t.dataset.k;
+if(k==='inc')S.inc[+t.dataset.p][+t.dataset.i]=+t.value||0;
+else if(k==='amt')S.exp[+t.dataset.e].a[+t.dataset.i]=+t.value||0;
+else if(k==='name'){S.exp[+t.dataset.e].n=t.value;
+document.querySelectorAll('input[data-k="name"][data-e="'+t.dataset.e+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
+else if(k==='pn'){S.names[+t.dataset.p]=t.value||('Partner '+(+t.dataset.p+1));save();return}
+else return;
+save();totals()});
+$('board').addEventListener('change',function(ev){var t=ev.target,k=t.dataset.k;
+if(k==='pn'){render()}
+else if(k==='owner'){S.exp[+t.dataset.e].o=+t.value;save();render()}
+else if(k==='pick'){var ei=+t.dataset.e,e=S.exp[ei];
+if(t.value==='__other'){e.c=true;e.n='Other'}else{e.c=false;e.n=t.value}
+save();render();
+var el=document.querySelector('input[data-k="name"][data-e="'+ei+'"]');if(el){el.focus();el.select()}}});
+
+function msg(t,bad){var m=$('msg');m.textContent=t;m.style.color=bad?'var(--neg)':'var(--mut)'}
+async function login(kind){var e=$('em').value.trim(),p=$('pw').value;
+if(!e||!p){msg('Type your email and password first.',1);return}
+msg('Please wait…');
+var r=kind==='up'?await sb.auth.signUp({email:e,password:p}):await sb.auth.signInWithPassword({email:e,password:p});
+if(r.error){msg(r.error.message,1);return}
+if(kind==='up'&&!r.data.session)msg('Account created. Check your email and tap the link to confirm, then sign in.')}
+async function forgot(){var e=$('em').value.trim();if(!e){msg('Type your email first, then tap Forgot password.',1);return}
+var r=await sb.auth.resetPasswordForEmail(e,{redirectTo:location.href.split('#')[0]});
+msg(r.error?r.error.message:'We sent you an email with a link to set a new password.',!!r.error)}
+
+document.addEventListener('click',function(ev){var b=ev.target.closest('button[data-a]');if(!b)return;var a=b.dataset.a,n=S.months.length;
+if(a==='in'||a==='up'){login(a);return}
+if(a==='fp'){forgot();return}
+if(a==='out'){sb.auth.signOut();return}
+if(a==='tog'){var k=+b.dataset.i;OPEN[k]=!OPEN[k];render();return}
+if(a==='del'){var e=S.exp[+b.dataset.e];if(!confirm('Remove “'+e.n+'”?'))return;S.exp.splice(+b.dataset.e,1)}
+else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(function(){return 0})})}
+else if(a==='addm'){var p=S.months[n-1].split('-');
+S.months.push(ym(new Date(+p[0],+p[1],1)));
+P.forEach(function(q){S.inc[q].push(S.inc[q][n-1])});
+S.exp.forEach(function(e){e.a.push(e.a[n-1])})}
+else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'?'))return;
+S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop()});S.exp.forEach(function(e){e.a.pop()})}
+else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
+while(j>=0&&j<S.exp.length&&S.exp[j].o!==S.exp[i].o)j+=d;
+if(j<0||j>=S.exp.length)return;
+var tmp=S.exp[i];S.exp[i]=S.exp[j];S.exp[j]=tmp}
+else if(a==='reset'){if(!confirm('Clear everything and start with an empty budget?'))return;S=fresh();setOpen()}
+save();render()});
+$('pw').addEventListener('keydown',function(ev){if(ev.key==='Enter')login('in')});
+
+/* ---------- starting up ---------- */
+function show(inside){$('auth').hidden=inside;$('board').hidden=!inside}
+async function enter(user){UID=user.id;$('who').textContent='Signed in as '+user.email;status('');await load();render();show(true)}
+if(/PASTE_/.test(SUPABASE_URL+SUPABASE_KEY)||!window.supabase){
+show(false);msg('Setup needed: open index.html and paste your Supabase URL and key (see README.md).',1)
+}else{
+sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+show(false);
+sb.auth.onAuthStateChange(function(ev,s){
+setTimeout(function(){
+if(ev==='PASSWORD_RECOVERY'){var np=prompt('Type your new password (at least 6 characters):');
+if(np)sb.auth.updateUser({password:np}).then(function(r){alert(r.error?r.error.message:'Password changed.')})}
+if(s&&s.user){if(UID!==s.user.id)enter(s.user)}
+else{UID=null;S=fresh();show(false);$('pw').value=''}},0)})}
+</script>
+</body>
+</html>
