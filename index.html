@@ -85,6 +85,7 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 <p class="sub" id="who"></p>
 <p class="sub">Partner code: <b id="code"></b>. Your partner signs up with their own email, then enters this code to share this budget (two people at most).</p>
 <div class="card pad"><div class="names" id="names"></div></div>
+<div id="savebox"></div>
 <div id="app"></div>
 <div class="bar">
 <button class="btn main" data-a="addm">Add next month</button>
@@ -106,8 +107,9 @@ var PRE=['Rent','Power','Food','Meat','Dog food','Wifi','House stuff','Worker','
 function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 var now=new Date(),CUR=ym(now);
 function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYear(),now.getMonth()+k,1))});
-return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],
+return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,
 exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
+function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0}
 var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='';
 function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -124,7 +126,7 @@ if(r.error||!r.data){status('Not saved – check your internet');return}LAST=r.d
 async function load(){var r=await sb.from('budgets').select('id,data,join_code,updated_at').limit(1).maybeSingle();
 if(r.error){status('Could not load – check your internet');return false}
 if(!r.data)return false;
-BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;setOpen();return true}
+BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;fix();setOpen();return true}
 
 /* ---------- drawing the budget ---------- */
 function nameCell(e,ei,p){var cu=e.c||PRE.indexOf(e.n)<0;
@@ -133,28 +135,33 @@ function person(p,i){
 var h='<h3>'+esc(S.names[p])+' pays</h3><table><tr><td><b>Salary</b></td><td class="am"><input type="number" inputmode="numeric" data-k="inc" data-p="'+p+'" data-i="'+i+'" value="'+S.inc[p][i]+'" aria-label="Salary"></td><td></td></tr>';
 S.exp.forEach(function(e,ei){if(e.o!==p)return;
 h+='<tr><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><button class="x" data-a="up" data-e="'+ei+'" aria-label="Move up" title="Move up">▲</button><button class="x" data-a="dn" data-e="'+ei+'" aria-label="Move down" title="Move down">▼</button><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
+h+='<tr><td><b>Put into savings</b></td><td class="am"><input type="number" inputmode="numeric" data-k="sav" data-p="'+p+'" data-i="'+i+'" value="'+S.sav[p][i]+'" aria-label="Put into savings"></td><td></td></tr>';
 h+='<tr class="tot"><td>Total bills</td><td id="t-'+p+'-'+i+'"></td><td></td></tr><tr class="left"><td>Left over</td><td id="l-'+p+'-'+i+'"></td><td></td></tr></table>';
 return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
 function month(m,i){var o=!!OPEN[i];
 return'<section class="card"><button class="mh" data-a="tog" data-i="'+i+'" aria-expanded="'+o+'"><span class="ar">'+(o?'▾':'▸')+'</span><b>'+ML(m)+'</b>'+(m===CUR?'<span class="now">This month</span>':'')+'<span id="ml-'+i+'"></span></button><div class="mb"'+(o?'':' hidden')+'>'+
 P.map(function(p){return person(p,i)}).join('')+
-'<h3>Together</h3><table>'+[['Income','ci'],['Bills','ce'],['Left over','cl'],['Saved so far','cs']].map(function(r){return'<tr class="'+(r[1]==='cl'?'left':'tot')+'"><td>'+r[0]+'</td><td id="'+r[1]+'-'+i+'"></td><td></td></tr>'}).join('')+'</table></div></section>'}
-function totals(){var run=0;
-S.months.forEach(function(m,i){var ci=0,ce=0;
-P.forEach(function(p){var inc=+S.inc[p][i]||0,t=0;
+'<h3>Together</h3><table>'+[['Income','ci'],['Bills','ce'],['Put into savings','cv'],['Left over','cl'],['Total saved so far','cs']].map(function(r){return'<tr class="'+(r[1]==='cl'?'left':'tot')+'"><td>'+r[0]+'</td><td id="'+r[1]+'-'+i+'"></td><td></td></tr>'}).join('')+'</table></div></section>'}
+function totals(){var run=+S.start||0;
+S.months.forEach(function(m,i){var ci=0,ce=0,cv=0;
+P.forEach(function(p){var inc=+S.inc[p][i]||0,t=0,sv=+S.sav[p][i]||0;
 S.exp.forEach(function(e){if(e.o===p)t+=+e.a[i]||0});
-ci+=inc;ce+=t;
-$('t-'+p+'-'+i).textContent=R(t);$('l-'+p+'-'+i).innerHTML=pill(inc-t)});
-run+=ci-ce;
-$('ci-'+i).textContent=R(ci);$('ce-'+i).textContent=R(ce);
-$('cl-'+i).innerHTML=pill(ci-ce);$('cs-'+i).textContent=R(run);$('ml-'+i).innerHTML=pill(ci-ce)})}
+ci+=inc;ce+=t;cv+=sv;
+$('t-'+p+'-'+i).textContent=R(t);$('l-'+p+'-'+i).innerHTML=pill(inc-t-sv)});
+run+=cv;
+$('ci-'+i).textContent=R(ci);$('ce-'+i).textContent=R(ce);$('cv-'+i).textContent=R(cv);
+$('cl-'+i).innerHTML=pill(ci-ce-cv);$('cs-'+i).textContent=R(run);$('ml-'+i).innerHTML=pill(ci-ce-cv)});
+$('tsv').textContent=R(run)}
 function render(){
 $('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
+$('savebox').innerHTML='<div class="card pad"><div class="top"><div><div class="sub" style="margin:0">Total saved</div><div id="tsv" style="font-size:30px;font-weight:800;color:var(--acc)"></div></div><div style="width:200px"><label for="sst" style="font-size:13px;color:var(--mut)">Already saved before you started</label><input id="sst" type="number" inputmode="numeric" data-k="start" value="'+(+S.start||0)+'"></div></div></div>';
 $('app').innerHTML=S.months.map(month).join('');totals()}
 
 /* ---------- typing and clicking ---------- */
 $('board').addEventListener('input',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='inc')S.inc[+t.dataset.p][+t.dataset.i]=+t.value||0;
+else if(k==='sav')S.sav[+t.dataset.p][+t.dataset.i]=+t.value||0;
+else if(k==='start')S.start=+t.value||0;
 else if(k==='amt')S.exp[+t.dataset.e].a[+t.dataset.i]=+t.value||0;
 else if(k==='name'){S.exp[+t.dataset.e].n=t.value;
 document.querySelectorAll('input[data-k="name"][data-e="'+t.dataset.e+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
@@ -191,10 +198,10 @@ if(a==='del'){var e=S.exp[+b.dataset.e];if(!confirm('Remove “'+e.n+'”?'))ret
 else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(function(){return 0})})}
 else if(a==='addm'){var p=S.months[n-1].split('-');
 S.months.push(ym(new Date(+p[0],+p[1],1)));
-P.forEach(function(q){S.inc[q].push(S.inc[q][n-1])});
+P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
 S.exp.forEach(function(e){e.a.push(e.a[n-1])})}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'?'))return;
-S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop()});S.exp.forEach(function(e){e.a.pop()})}
+S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop()})}
 else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
 while(j>=0&&j<S.exp.length&&S.exp[j].o!==S.exp[i].o)j+=d;
 if(j<0||j>=S.exp.length)return;
@@ -213,7 +220,7 @@ async function joinBudget(){var c=$('jc').value.trim();if(!c){cm('Type the code 
 cm('Please wait…');var r=await sb.rpc('join_budget',{code:c});if(r.error){cm(r.error.message,1);return}openBoard()}
 setInterval(async function(){if(!UID||!BID||T||document.hidden)return;var a=document.activeElement;if(a&&/INPUT|SELECT/.test(a.tagName))return;
 var r=await sb.from('budgets').select('data,updated_at').eq('id',BID).maybeSingle();
-if(r.data&&r.data.updated_at!==LAST&&!T){LAST=r.data.updated_at;S=r.data.data;render();status('Updated ✓')}},15000);
+if(r.data&&r.data.updated_at!==LAST&&!T){LAST=r.data.updated_at;S=r.data.data;fix();render();status('Updated ✓')}},15000);
 if(/PASTE_/.test(SUPABASE_URL+SUPABASE_KEY)||!window.supabase){
 show('auth');msg('Setup needed: open index.html and paste your Supabase URL and key (see README.md).',1)
 }else{
