@@ -68,9 +68,22 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 </div>
 </div>
 
+<div id="choose" hidden>
+<h1>Welcome</h1>
+<p class="sub">Start a new budget, or join your partner’s budget with the code they give you.</p>
+<div class="card pad">
+<button class="btn main" data-a="new">Start a new budget</button>
+<h3>Join my partner’s budget</h3>
+<input id="jc" placeholder="Partner code, for example 3f9a1c2b" autocapitalize="off" autocomplete="off">
+<div class="bar"><button class="btn" data-a="join">Join</button><button class="btn" data-a="out">Sign out</button></div>
+<p class="hint" id="cmsg" role="status"></p>
+</div>
+</div>
+
 <div id="board" hidden>
 <div class="top"><h1>Our budget</h1><div><span id="st"></span><button class="btn" data-a="out">Sign out</button></div></div>
 <p class="sub" id="who"></p>
+<p class="sub">Partner code: <b id="code"></b>. Your partner signs up with their own email, then enters this code to share this budget (two people at most).</p>
 <div class="card pad"><div class="names" id="names"></div></div>
 <div id="app"></div>
 <div class="bar">
@@ -95,7 +108,7 @@ var now=new Date(),CUR=ym(now);
 function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYear(),now.getMonth()+k,1))});
 return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],
 exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
-var S=fresh(),OPEN={},UID=null,T=null,sb=null;
+var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='';
 function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 function ML(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleString('en-ZA',{month:'short',year:'numeric'})}
@@ -106,11 +119,12 @@ function $(id){return document.getElementById(id)}
 /* ---------- saving to the account ---------- */
 function status(t){$('st').textContent=t}
 function save(){if(!UID)return;status('Saving…');clearTimeout(T);T=setTimeout(push,700)}
-async function push(){var r=await sb.from('budgets').upsert({user_id:UID,data:S,updated_at:new Date().toISOString()});
-status(r.error?'Not saved – check your internet':'Saved ✓')}
-async function load(){var r=await sb.from('budgets').select('data').eq('user_id',UID).maybeSingle();
-if(r.data&&r.data.data&&r.data.data.months){S=r.data.data}else{S=fresh();if(!r.error)await push()}
-if(r.error)status('Could not load – check your internet');setOpen()}
+async function push(){T=null;var r=await sb.from('budgets').update({data:S,updated_at:new Date().toISOString()}).eq('id',BID).select('updated_at').maybeSingle();
+if(r.error||!r.data){status('Not saved – check your internet');return}LAST=r.data.updated_at;status('Saved ✓')}
+async function load(){var r=await sb.from('budgets').select('id,data,join_code,updated_at').limit(1).maybeSingle();
+if(r.error){status('Could not load – check your internet');return false}
+if(!r.data)return false;
+BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;setOpen();return true}
 
 /* ---------- drawing the budget ---------- */
 function nameCell(e,ei,p){var cu=e.c||PRE.indexOf(e.n)<0;
@@ -169,7 +183,9 @@ msg(r.error?r.error.message:'We sent you an email with a link to set a new passw
 document.addEventListener('click',function(ev){var b=ev.target.closest('button[data-a]');if(!b)return;var a=b.dataset.a,n=S.months.length;
 if(a==='in'||a==='up'){login(a);return}
 if(a==='fp'){forgot();return}
-if(a==='out'){sb.auth.signOut();return}
+if(a==='new'){newBudget();return}
+if(a==='join'){joinBudget();return}
+if(a==='out'){BID=null;sb.auth.signOut();return}
 if(a==='tog'){var k=+b.dataset.i;OPEN[k]=!OPEN[k];render();return}
 if(a==='del'){var e=S.exp[+b.dataset.e];if(!confirm('Remove “'+e.n+'”?'))return;S.exp.splice(+b.dataset.e,1)}
 else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(function(){return 0})})}
@@ -188,19 +204,27 @@ save();render()});
 $('pw').addEventListener('keydown',function(ev){if(ev.key==='Enter')login('in')});
 
 /* ---------- starting up ---------- */
-function show(inside){$('auth').hidden=inside;$('board').hidden=!inside}
-async function enter(user){UID=user.id;$('who').textContent='Signed in as '+user.email;status('');await load();render();show(true)}
+function show(w){$('auth').hidden=(w!=='auth');$('choose').hidden=(w!=='choose');$('board').hidden=(w!=='board')}
+async function openBoard(){var ok=await load();if(ok){render();$('code').textContent=CODE;show('board')}else show('choose')}
+async function enter(user){UID=user.id;$('who').textContent='Signed in as '+user.email;status('');await openBoard()}
+function cm(t,bad){var m=$('cmsg');m.textContent=t;m.style.color=bad?'var(--neg)':'var(--mut)'}
+async function newBudget(){cm('Please wait…');var r=await sb.rpc('create_budget',{d:fresh()});if(r.error){cm(r.error.message,1);return}openBoard()}
+async function joinBudget(){var c=$('jc').value.trim();if(!c){cm('Type the code your partner gave you.',1);return}
+cm('Please wait…');var r=await sb.rpc('join_budget',{code:c});if(r.error){cm(r.error.message,1);return}openBoard()}
+setInterval(async function(){if(!UID||!BID||T||document.hidden)return;var a=document.activeElement;if(a&&/INPUT|SELECT/.test(a.tagName))return;
+var r=await sb.from('budgets').select('data,updated_at').eq('id',BID).maybeSingle();
+if(r.data&&r.data.updated_at!==LAST&&!T){LAST=r.data.updated_at;S=r.data.data;render();status('Updated ✓')}},15000);
 if(/PASTE_/.test(SUPABASE_URL+SUPABASE_KEY)||!window.supabase){
-show(false);msg('Setup needed: open index.html and paste your Supabase URL and key (see README.md).',1)
+show('auth');msg('Setup needed: open index.html and paste your Supabase URL and key (see README.md).',1)
 }else{
 sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-show(false);
+show('auth');
 sb.auth.onAuthStateChange(function(ev,s){
 setTimeout(function(){
 if(ev==='PASSWORD_RECOVERY'){var np=prompt('Type your new password (at least 6 characters):');
 if(np)sb.auth.updateUser({password:np}).then(function(r){alert(r.error?r.error.message:'Password changed.')})}
 if(s&&s.user){if(UID!==s.user.id)enter(s.user)}
-else{UID=null;S=fresh();show(false);$('pw').value=''}},0)})}
+else{UID=null;S=fresh();show('auth');$('pw').value=''}},0)})}
 </script>
 </body>
 </html>
