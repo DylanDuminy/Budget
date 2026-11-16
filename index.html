@@ -92,7 +92,7 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 <button class="btn" data-a="delm">Remove last month</button>
 <button class="btn" data-a="reset">Start over</button>
 </div>
-<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Use ▲ ▼ to change the order and “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
+<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Bills are listed from biggest to smallest, and any bill you name yourself is added to the list for next time. Use “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
 </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -107,9 +107,9 @@ var PRE=['Rent','Power','Food','Meat','Dog food','Wifi','House stuff','Worker','
 function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 var now=new Date(),CUR=ym(now);
 function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYear(),now.getMonth()+k,1))});
-return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,
+return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,custom:[],
 exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
-function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0}
+function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;if(!S.custom)S.custom=[]}
 var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='';
 function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -129,12 +129,19 @@ if(!r.data)return false;
 BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;fix();setOpen();return true}
 
 /* ---------- drawing the budget ---------- */
-function nameCell(e,ei,p){var cu=e.c||PRE.indexOf(e.n)<0;
-return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+PRE.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+n+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
+function LIST(){return PRE.concat(S.custom||[])}
+function nameCell(e,ei,p){var L=LIST(),cu=e.c||L.indexOf(e.n)<0;
+return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
+function sorted(p,i){return S.exp.map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a[i]||0)-(+a.e.a[i]||0)})}
+var KEY='';
+function orderKey(){return S.months.map(function(m,i){return P.map(function(p){return sorted(p,i).map(function(x){return x.ei}).join()}).join('|')}).join('/')}
+function resort(){var a=document.activeElement,q=null;
+if(a&&a.dataset&&a.dataset.k){q=a.tagName.toLowerCase()+'[data-k="'+a.dataset.k+'"]';['p','e','i'].forEach(function(x){if(a.dataset[x]!=null)q+='[data-'+x+'="'+a.dataset[x]+'"]'})}
+render();if(q){var el=document.querySelector(q);if(el)el.focus()}}
 function person(p,i){
 var h='<h3>'+esc(S.names[p])+' pays</h3><table><tr><td><b>Salary</b></td><td class="am"><input type="number" inputmode="numeric" data-k="inc" data-p="'+p+'" data-i="'+i+'" value="'+S.inc[p][i]+'" aria-label="Salary"></td><td></td></tr>';
-S.exp.forEach(function(e,ei){if(e.o!==p)return;
-h+='<tr><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><button class="x" data-a="up" data-e="'+ei+'" aria-label="Move up" title="Move up">▲</button><button class="x" data-a="dn" data-e="'+ei+'" aria-label="Move down" title="Move down">▼</button><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
+sorted(p,i).forEach(function(x){var e=x.e,ei=x.ei;
+h+='<tr><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
 h+='<tr><td><b>Put into savings</b></td><td class="am"><input type="number" inputmode="numeric" data-k="sav" data-p="'+p+'" data-i="'+i+'" value="'+S.sav[p][i]+'" aria-label="Put into savings"></td><td></td></tr>';
 h+='<tr class="tot"><td>Total bills</td><td id="t-'+p+'-'+i+'"></td><td></td></tr><tr class="left"><td>Left over</td><td id="l-'+p+'-'+i+'"></td><td></td></tr></table>';
 return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
@@ -155,7 +162,7 @@ $('tsv').textContent=R(run)}
 function render(){
 $('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
 $('savebox').innerHTML='<div class="card pad"><div class="top"><div><div class="sub" style="margin:0">Total saved</div><div id="tsv" style="font-size:30px;font-weight:800;color:var(--acc)"></div></div><div style="width:200px"><label for="sst" style="font-size:13px;color:var(--mut)">Already saved before you started</label><input id="sst" type="number" inputmode="numeric" data-k="start" value="'+(+S.start||0)+'"></div></div></div>';
-$('app').innerHTML=S.months.map(month).join('');totals()}
+$('app').innerHTML=S.months.map(month).join('');KEY=orderKey();totals()}
 
 /* ---------- typing and clicking ---------- */
 $('board').addEventListener('input',function(ev){var t=ev.target,k=t.dataset.k;
@@ -170,6 +177,9 @@ else return;
 save();totals()});
 $('board').addEventListener('change',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='pn'){render()}
+else if(k==='amt'){setTimeout(function(){if(orderKey()!==KEY)resort()},250)}
+else if(k==='name'){var e2=S.exp[+t.dataset.e],nm=t.value.trim();
+if(nm&&nm!=='Other'&&nm.length<=30){if(LIST().indexOf(nm)<0)S.custom.push(nm);e2.n=nm;e2.c=false;save();render()}}
 else if(k==='owner'){S.exp[+t.dataset.e].o=+t.value;save();render()}
 else if(k==='pick'){var ei=+t.dataset.e,e=S.exp[ei];
 if(t.value==='__other'){e.c=true;e.n='Other'}else{e.c=false;e.n=t.value}
@@ -199,7 +209,7 @@ else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(fu
 else if(a==='addm'){var p=S.months[n-1].split('-');
 S.months.push(ym(new Date(+p[0],+p[1],1)));
 P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
-S.exp.forEach(function(e){e.a.push(e.a[n-1])})}
+S.exp.forEach(function(e){e.a.push(e.a[n-1])});OPEN[n]=true}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'?'))return;
 S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop()})}
 else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
