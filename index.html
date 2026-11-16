@@ -48,6 +48,8 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 #auth{max-width:380px;margin:8vh auto 0}
 #auth input{margin:6px 0 10px}
 #st{color:var(--mut);font-size:14px;margin-right:8px}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 12px;margin:6px 6px 0 0}
+.chip .x{font-size:18px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -86,6 +88,8 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 <p class="sub">Partner code: <b id="code"></b>. Your partner signs up with their own email, then enters this code to share this budget (two people at most).</p>
 <div class="card pad"><div class="names" id="names"></div></div>
 <div id="savebox"></div>
+<div class="bar" style="margin:0 0 12px"><button class="btn" data-a="tl">Edit bill list</button></div>
+<div id="listbox"></div>
 <div id="app"></div>
 <div class="bar">
 <button class="btn main" data-a="addm">Add next month</button>
@@ -107,9 +111,9 @@ var PRE=['Rent','Power','Food','Meat','Dog food','Wifi','House stuff','Worker','
 function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 var now=new Date(),CUR=ym(now);
 function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYear(),now.getMonth()+k,1))});
-return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,custom:[],
+return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,list:PRE.slice(),
 exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
-function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;if(!S.custom)S.custom=[]}
+function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;if(!S.list)S.list=PRE.concat(S.custom||[]).filter(function(n,i,a){return a.indexOf(n)===i})}
 var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='';
 function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -129,11 +133,11 @@ if(!r.data)return false;
 BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;fix();setOpen();return true}
 
 /* ---------- drawing the budget ---------- */
-function LIST(){return PRE.concat(S.custom||[])}
+function LIST(){return S.list||PRE}
 function nameCell(e,ei,p){var L=LIST(),cu=e.c||L.indexOf(e.n)<0;
 return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
 function sorted(p,i){return S.exp.map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a[i]||0)-(+a.e.a[i]||0)})}
-var KEY='';
+var KEY='',LOPEN=false;
 function orderKey(){return S.months.map(function(m,i){return P.map(function(p){return sorted(p,i).map(function(x){return x.ei}).join()}).join('|')}).join('/')}
 function resort(){var a=document.activeElement,q=null;
 if(a&&a.dataset&&a.dataset.k){q=a.tagName.toLowerCase()+'[data-k="'+a.dataset.k+'"]';['p','e','i'].forEach(function(x){if(a.dataset[x]!=null)q+='[data-'+x+'="'+a.dataset[x]+'"]'})}
@@ -162,6 +166,7 @@ $('tsv').textContent=R(run)}
 function render(){
 $('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
 $('savebox').innerHTML='<div class="card pad"><div class="top"><div><div class="sub" style="margin:0">Total saved</div><div id="tsv" style="font-size:30px;font-weight:800;color:var(--acc)"></div></div><div style="width:200px"><label for="sst" style="font-size:13px;color:var(--mut)">Already saved before you started</label><input id="sst" type="number" inputmode="numeric" data-k="start" value="'+(+S.start||0)+'"></div></div></div>';
+$('listbox').innerHTML=LOPEN?'<div class="card pad"><b>Bill list</b><p class="hint" style="margin:4px 0 0">These are the names in the drop-down. Remove ones you don’t use, or add your own. Bills already using a name you remove keep their name.</p><div>'+LIST().map(function(n,k){return'<span class="chip">'+esc(n)+'<button class="x" data-a="lr" data-n="'+k+'" aria-label="Remove '+esc(n)+'" title="Remove">×</button></span>'}).join('')+'</div><div class="bar"><input id="nl" placeholder="New bill name, for example Gym" maxlength="30" style="flex:1;min-width:160px"><button class="btn main" data-a="la">Add to list</button></div></div>':'';
 $('app').innerHTML=S.months.map(month).join('');KEY=orderKey();totals()}
 
 /* ---------- typing and clicking ---------- */
@@ -179,7 +184,7 @@ $('board').addEventListener('change',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='pn'){render()}
 else if(k==='amt'){setTimeout(function(){if(orderKey()!==KEY)resort()},250)}
 else if(k==='name'){var e2=S.exp[+t.dataset.e],nm=t.value.trim();
-if(nm&&nm!=='Other'&&nm.length<=30){if(LIST().indexOf(nm)<0)S.custom.push(nm);e2.n=nm;e2.c=false;save();render()}}
+if(nm&&nm!=='Other'&&nm.length<=30){if(LIST().indexOf(nm)<0)S.list.push(nm);e2.n=nm;e2.c=false;save();render()}}
 else if(k==='owner'){S.exp[+t.dataset.e].o=+t.value;save();render()}
 else if(k==='pick'){var ei=+t.dataset.e,e=S.exp[ei];
 if(t.value==='__other'){e.c=true;e.n='Other'}else{e.c=false;e.n=t.value}
@@ -200,6 +205,10 @@ msg(r.error?r.error.message:'We sent you an email with a link to set a new passw
 document.addEventListener('click',function(ev){var b=ev.target.closest('button[data-a]');if(!b)return;var a=b.dataset.a,n=S.months.length;
 if(a==='in'||a==='up'){login(a);return}
 if(a==='fp'){forgot();return}
+if(a==='tl'){LOPEN=!LOPEN;render();return}
+if(a==='la'){var v=$('nl').value.trim();if(!v)return;if(LIST().indexOf(v)>=0){alert('That name is already in the list.');return}
+S.list.push(v);save();render();$('nl').focus();return}
+if(a==='lr'){var nm=LIST()[+b.dataset.n];if(!confirm('Remove “'+nm+'” from the list?'))return;S.list.splice(+b.dataset.n,1);save();render();return}
 if(a==='new'){newBudget();return}
 if(a==='join'){joinBudget();return}
 if(a==='out'){BID=null;sb.auth.signOut();return}
@@ -218,6 +227,7 @@ if(j<0||j>=S.exp.length)return;
 var tmp=S.exp[i];S.exp[i]=S.exp[j];S.exp[j]=tmp}
 else if(a==='reset'){if(!confirm('Clear everything and start with an empty budget?'))return;S=fresh();setOpen()}
 save();render()});
+document.addEventListener('keydown',function(ev){if(ev.key==='Enter'&&ev.target.id==='nl'){ev.preventDefault();var b=document.querySelector('button[data-a="la"]');if(b)b.click()}});
 $('pw').addEventListener('keydown',function(ev){if(ev.key==='Enter')login('in')});
 
 /* ---------- starting up ---------- */
