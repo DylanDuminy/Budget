@@ -65,6 +65,11 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 .tip{padding:8px 0;border-top:1px solid var(--line)}
 .paid input[type=number]{opacity:.5;text-decoration:line-through}
 input[type=checkbox]{width:20px;height:20px;padding:0;vertical-align:middle;accent-color:var(--acc)}
+.donut{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:12px}
+.donut svg{width:200px;max-width:100%;flex:none;margin:0 auto}
+.dl{flex:1;min-width:200px}
+.dr{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;margin:5px 0;font-size:14px}
+.dr i{width:12px;height:12px;border-radius:4px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -177,7 +182,14 @@ data.map(function(d){return'<div class="grp"><div class="vc">'+bar(d.ci,'var(--a
 var d=data[CM],bills=S.exp.map(function(e){return{n:e.n,v:+e.a[CM]||0}}).filter(function(b){return b.v>0}).sort(function(a,b){return b.v-a.v});
 var top=bills.length?bills[0].v:1;
 h+='<h3>Where the money goes</h3><select data-k="cm" aria-label="Month" style="width:auto">'+S.months.map(function(m,i){return'<option value="'+i+'"'+(i===CM?' selected':'')+'>'+ML(m)+'</option>'}).join('')+'</select>';
-h+=bills.length?bills.map(function(b){return'<div class="brow"><span>'+esc(b.n)+'</span><div class="bbg"><div class="bfg" style="width:'+Math.round(b.v/top*100)+'%"></div></div><span>'+R(b.v)+(d.ci?' · '+Math.round(b.v/d.ci*100)+'%':'')+'</span></div>'}).join(''):'<p class="hint">Add some bill amounts to see this chart.</p>';
+if(bills.length){var COL=['#0f766e','#2b8cbe','#e6a817','#d6604d','#8e6bbf','#4daf4a','#e377c2','#8c6d31','#7f8c8d'],tot=0,segs=bills.slice(0,8).map(function(b){return{n:b.n,v:b.v}}),rest=0;
+bills.slice(8).forEach(function(b){rest+=b.v});if(rest)segs.push({n:'Other bills',v:rest});
+bills.forEach(function(b){tot+=b.v});
+var C=2*Math.PI*70,off=0,svg='<svg viewBox="0 0 200 200" role="img" aria-label="Your bills as a circle chart" style="display:block"><g transform="rotate(-90 100 100)">';
+segs.forEach(function(g,k){var len=g.v/tot*C;svg+='<circle cx="100" cy="100" r="70" fill="none" stroke="'+COL[k%COL.length]+'" stroke-width="34" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'"></circle>';off+=len});
+svg+='</g><text x="100" y="98" text-anchor="middle" style="fill:var(--ink);font:800 17px Figtree,sans-serif">'+R(tot)+'</text><text x="100" y="118" text-anchor="middle" style="fill:var(--mut);font:13px Figtree,sans-serif">bills</text></svg>';
+h+='<div class="donut">'+svg+'<div class="dl">'+segs.map(function(g,k){return'<div class="dr"><i style="background:'+COL[k%COL.length]+'"></i><span>'+esc(g.n)+'</span><span>'+R(g.v)+' · '+Math.round(g.v/tot*100)+'%</span></div>'}).join('')+'</div></div>'}
+else h+='<p class="hint">Add some bill amounts to see this chart.</p>';
 var flex=0;bills.forEach(function(b){if(!/rent|loan|bond|insurance/i.test(b.n))flex+=b.v});
 h+='<h3>Ways to cut your expenses</h3><p class="sub" style="margin:0 0 8px">'+(d.ci?'Bills take '+Math.round(d.ce/d.ci*100)+'% of your income and you put away '+Math.round(d.cv/d.ci*100)+'%. ':'')+(d.ci&&d.ce+d.cv>d.ci?'You are spending more than you earn this month, so start with the biggest bills below.':'A common goal is to save 10 to 20% of your income.')+'</p>';
 h+='<label for="cut" style="font-size:14px;color:var(--mut)">If you cut your flexible bills (everything except rent, loans and insurance) by </label><select id="cut" data-k="cut" style="width:auto">'+[5,10,15,20].map(function(x){return'<option'+(x===CUT?' selected':'')+'>'+x+'</option>'}).join('')+'</select> %';
