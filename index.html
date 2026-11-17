@@ -50,6 +50,21 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 #st{color:var(--mut);font-size:14px;margin-right:8px}
 .chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 12px;margin:6px 6px 0 0}
 .chip .x{font-size:18px}
+.grps{display:flex;gap:10px;overflow-x:auto;padding:8px 0}
+.grp{flex:1;min-width:84px;text-align:center}
+.vc{display:flex;align-items:flex-end;justify-content:center;gap:4px;height:150px;border-bottom:1px solid var(--line)}
+.vb{width:20px;border-radius:5px 5px 0 0}
+.gl{font-weight:600;margin-top:4px}
+.gs{font-size:12px;color:var(--mut)}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--mut);margin:6px 0}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.brow{display:grid;grid-template-columns:100px 1fr 110px;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+.brow span:last-child{text-align:right}
+.bbg{background:var(--line);border-radius:6px;height:14px}
+.bfg{height:100%;border-radius:6px;background:var(--acc)}
+.tip{padding:8px 0;border-top:1px solid var(--line)}
+.paid input[type=number]{opacity:.5;text-decoration:line-through}
+input[type=checkbox]{width:20px;height:20px;padding:0;vertical-align:middle;accent-color:var(--acc)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -88,7 +103,8 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 <p class="sub">Partner code: <b id="code"></b>. Your partner signs up with their own email, then enters this code to share this budget (two people at most).</p>
 <div class="card pad"><div class="names" id="names"></div></div>
 <div id="savebox"></div>
-<div class="bar" style="margin:0 0 12px"><button class="btn" data-a="tl">Edit bill list</button></div>
+<div class="bar" style="margin:0 0 12px"><button class="btn" data-a="tl">Edit bill list</button> <button class="btn" data-a="tc">Charts and savings tips</button></div>
+<div id="charts"></div>
 <div id="listbox"></div>
 <div id="app"></div>
 <div class="bar">
@@ -96,7 +112,7 @@ button.main{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 <button class="btn" data-a="delm">Remove last month</button>
 <button class="btn" data-a="reset">Start over</button>
 </div>
-<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Bills are listed from biggest to smallest, and any bill you name yourself is added to the list for next time. Use “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
+<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Bills are listed from biggest to smallest, and any bill you name yourself is added to the list for next time. Tick the box next to a bill when you have paid it. Use “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
 </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -114,8 +130,8 @@ function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYea
 return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,list:PRE.slice(),
 exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
 function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;if(!S.list)S.list=PRE.concat(S.custom||[]).filter(function(n,i,a){return a.indexOf(n)===i})}
-var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='';
-function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true}
+var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='',CM=0,CH=false,CUT=10;
+function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true;CM=i<0?0:i}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 function ML(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleString('en-ZA',{month:'short',year:'numeric'})}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
@@ -137,6 +153,38 @@ function LIST(){return S.list||PRE}
 function nameCell(e,ei,p){var L=LIST(),cu=e.c||L.indexOf(e.n)<0;
 return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
 function sorted(p,i){return S.exp.map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a[i]||0)-(+a.e.a[i]||0)})}
+var TIPS=[[/food|grocer/i,'Plan meals for the week, shop with a list, buy staples in bulk, and use up leftovers.'],
+[/meat|butcher/i,'Buy meat in bulk on special, freeze portions, and stretch meals with beans, rice or vegetables.'],
+[/power|electric/i,'Use a geyser timer, switch to LED bulbs, turn off devices on standby, and go easy on heaters.'],
+[/wifi|internet|fibre/i,'Compare fibre deals, ask your provider for a loyalty discount, or move to a slower package.'],
+[/phone|airtime|data/i,'Move to a cheaper contract or prepaid, and use Wi-Fi at home to cut data costs.'],
+[/car|fuel|petrol/i,'Combine trips, keep your tyres pumped up, drive smoothly, and compare insurance quotes every year.'],
+[/insur/i,'Get quotes from two or three companies each year and consider a higher excess.'],
+[/loan|credit|card|debt/i,'Pay a little extra on the loan with the highest interest first, and ask if you can move to a cheaper rate.'],
+[/rent|bond/i,'Rent is hard to cut, but ask for a discount when you renew your lease or compare cheaper places.'],
+[/dog|pet/i,'Buy the big bag, compare brands, and keep up with vet visits so small problems stay cheap.'],
+[/nail|hair|beauty/i,'Go less often, stretch the time between visits, or do some of it at home.'],
+[/house|home/i,'Write a list, buy on special, and wait a few days before big purchases.'],
+[/worker|staff/i,'Check the hours you pay for and whether all of them are needed.']];
+function K(n){n=Math.round(n);return Math.abs(n)>=1000?(Math.round(n/100)/10)+'k':String(n)}
+function drawCharts(){var el=$('charts');if(!el)return;if(!CH){el.innerHTML='';return}
+var n=S.months.length;if(CM>=n)CM=n-1;
+var data=S.months.map(function(m,i){var ci=0,ce=0,cv=0;P.forEach(function(p){ci+=+S.inc[p][i]||0;cv+=+S.sav[p][i]||0});S.exp.forEach(function(e){ce+=+e.a[i]||0});return{m:m,ci:ci,ce:ce,cv:cv}});
+var mx=Math.max.apply(null,data.map(function(d){return Math.max(d.ci,d.ce,d.cv)}).concat([1]));
+function bar(v,c,l){return'<div class="vb" title="'+l+': '+R(v)+'" style="height:'+Math.max(2,Math.round(v/mx*150))+'px;background:'+c+'"></div>'}
+var h='<div class="card pad"><b>Charts</b><div class="leg"><span><i style="background:var(--acc)"></i>Income</span><span><i style="background:var(--neg)"></i>Bills</span><span><i style="background:var(--pos)"></i>Savings</span></div><div class="grps">'+
+data.map(function(d){return'<div class="grp"><div class="vc">'+bar(d.ci,'var(--acc)','Income')+bar(d.ce,'var(--neg)','Bills')+bar(d.cv,'var(--pos)','Savings')+'</div><div class="gl">'+ML(d.m)+'</div><div class="gs">'+K(d.ci)+' / '+K(d.ce)+' / '+K(d.cv)+'</div></div>'}).join('')+'</div>';
+var d=data[CM],bills=S.exp.map(function(e){return{n:e.n,v:+e.a[CM]||0}}).filter(function(b){return b.v>0}).sort(function(a,b){return b.v-a.v});
+var top=bills.length?bills[0].v:1;
+h+='<h3>Where the money goes</h3><select data-k="cm" aria-label="Month" style="width:auto">'+S.months.map(function(m,i){return'<option value="'+i+'"'+(i===CM?' selected':'')+'>'+ML(m)+'</option>'}).join('')+'</select>';
+h+=bills.length?bills.map(function(b){return'<div class="brow"><span>'+esc(b.n)+'</span><div class="bbg"><div class="bfg" style="width:'+Math.round(b.v/top*100)+'%"></div></div><span>'+R(b.v)+(d.ci?' · '+Math.round(b.v/d.ci*100)+'%':'')+'</span></div>'}).join(''):'<p class="hint">Add some bill amounts to see this chart.</p>';
+var flex=0;bills.forEach(function(b){if(!/rent|loan|bond|insurance/i.test(b.n))flex+=b.v});
+h+='<h3>Ways to cut your expenses</h3><p class="sub" style="margin:0 0 8px">'+(d.ci?'Bills take '+Math.round(d.ce/d.ci*100)+'% of your income and you put away '+Math.round(d.cv/d.ci*100)+'%. ':'')+(d.ci&&d.ce+d.cv>d.ci?'You are spending more than you earn this month, so start with the biggest bills below.':'A common goal is to save 10 to 20% of your income.')+'</p>';
+h+='<label for="cut" style="font-size:14px;color:var(--mut)">If you cut your flexible bills (everything except rent, loans and insurance) by </label><select id="cut" data-k="cut" style="width:auto">'+[5,10,15,20].map(function(x){return'<option'+(x===CUT?' selected':'')+'>'+x+'</option>'}).join('')+'</select> %';
+h+='<p>You would save <b>'+R(flex*CUT/100)+'</b> a month, which is <b>'+R(flex*CUT/100*12)+'</b> over a year.</p>';
+h+=bills.slice(0,5).map(function(b){var t='';TIPS.some(function(x){if(x[0].test(b.n)){t=x[1];return true}});
+return'<div class="tip"><b>'+esc(b.n)+'</b> – '+R(b.v)+(d.ci?' ('+Math.round(b.v/d.ci*100)+'% of income)':'')+'<br><span class="hint">'+(t||'Ask whether you need this every month, and compare prices before you pay.')+'</span></div>'}).join('');
+el.innerHTML=h+'</div>'}
 var KEY='',LOPEN=false;
 function orderKey(){return S.months.map(function(m,i){return P.map(function(p){return sorted(p,i).map(function(x){return x.ei}).join()}).join('|')}).join('/')}
 function resort(){var a=document.activeElement,q=null;
@@ -145,24 +193,25 @@ render();if(q){var el=document.querySelector(q);if(el)el.focus()}}
 function person(p,i){
 var h='<h3>'+esc(S.names[p])+' pays</h3><table><tr><td><b>Salary</b></td><td class="am"><input type="number" inputmode="numeric" data-k="inc" data-p="'+p+'" data-i="'+i+'" value="'+S.inc[p][i]+'" aria-label="Salary"></td><td></td></tr>';
 sorted(p,i).forEach(function(x){var e=x.e,ei=x.ei;
-h+='<tr><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
+h+='<tr'+(e.p&&e.p[i]?' class="paid"':'')+'><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><input type="checkbox" data-k="paid" data-e="'+ei+'" data-i="'+i+'"'+(e.p&&e.p[i]?' checked':'')+' aria-label="Paid" title="Tick when paid"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
 h+='<tr><td><b>Put into savings</b></td><td class="am"><input type="number" inputmode="numeric" data-k="sav" data-p="'+p+'" data-i="'+i+'" value="'+S.sav[p][i]+'" aria-label="Put into savings"></td><td></td></tr>';
 h+='<tr class="tot"><td>Total bills</td><td id="t-'+p+'-'+i+'"></td><td></td></tr><tr class="left"><td>Left over</td><td id="l-'+p+'-'+i+'"></td><td></td></tr></table>';
 return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
 function month(m,i){var o=!!OPEN[i];
 return'<section class="card"><button class="mh" data-a="tog" data-i="'+i+'" aria-expanded="'+o+'"><span class="ar">'+(o?'▾':'▸')+'</span><b>'+ML(m)+'</b>'+(m===CUR?'<span class="now">This month</span>':'')+'<span id="ml-'+i+'"></span></button><div class="mb"'+(o?'':' hidden')+'>'+
 P.map(function(p){return person(p,i)}).join('')+
-'<h3>Together</h3><table>'+[['Income','ci'],['Bills','ce'],['Put into savings','cv'],['Left over','cl'],['Total saved so far','cs']].map(function(r){return'<tr class="'+(r[1]==='cl'?'left':'tot')+'"><td>'+r[0]+'</td><td id="'+r[1]+'-'+i+'"></td><td></td></tr>'}).join('')+'</table></div></section>'}
+'<h3>Together</h3><table>'+[['Income','ci'],['Bills','ce'],['Still to pay','cp'],['Put into savings','cv'],['Left over','cl'],['Total saved so far','cs']].map(function(r){return'<tr class="'+(r[1]==='cl'?'left':'tot')+'"><td>'+r[0]+'</td><td id="'+r[1]+'-'+i+'"></td><td></td></tr>'}).join('')+'</table></div></section>'}
 function totals(){var run=+S.start||0;
 S.months.forEach(function(m,i){var ci=0,ce=0,cv=0;
 P.forEach(function(p){var inc=+S.inc[p][i]||0,t=0,sv=+S.sav[p][i]||0;
 S.exp.forEach(function(e){if(e.o===p)t+=+e.a[i]||0});
 ci+=inc;ce+=t;cv+=sv;
 $('t-'+p+'-'+i).textContent=R(t);$('l-'+p+'-'+i).innerHTML=pill(inc-t-sv)});
+var cp=0;S.exp.forEach(function(e){if(!(e.p&&e.p[i]))cp+=+e.a[i]||0});$('cp-'+i).textContent=R(cp);
 run+=cv;
 $('ci-'+i).textContent=R(ci);$('ce-'+i).textContent=R(ce);$('cv-'+i).textContent=R(cv);
 $('cl-'+i).innerHTML=pill(ci-ce-cv);$('cs-'+i).textContent=R(run);$('ml-'+i).innerHTML=pill(ci-ce-cv)});
-$('tsv').textContent=R(run)}
+$('tsv').textContent=R(run);drawCharts()}
 function render(){
 $('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
 $('savebox').innerHTML='<div class="card pad"><div class="top"><div><div class="sub" style="margin:0">Total saved</div><div id="tsv" style="font-size:30px;font-weight:800;color:var(--acc)"></div></div><div style="width:200px"><label for="sst" style="font-size:13px;color:var(--mut)">Already saved before you started</label><input id="sst" type="number" inputmode="numeric" data-k="start" value="'+(+S.start||0)+'"></div></div></div>';
@@ -182,6 +231,10 @@ else return;
 save();totals()});
 $('board').addEventListener('change',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='pn'){render()}
+else if(k==='paid'){var e3=S.exp[+t.dataset.e];if(!e3.p)e3.p=[];e3.p[+t.dataset.i]=t.checked;
+var tr=t.closest('tr');if(tr)tr.classList.toggle('paid',t.checked);save();totals()}
+else if(k==='cm'){CM=+t.value;drawCharts()}
+else if(k==='cut'){CUT=+t.value;drawCharts()}
 else if(k==='amt'){setTimeout(function(){if(orderKey()!==KEY)resort()},250)}
 else if(k==='name'){var e2=S.exp[+t.dataset.e],nm=t.value.trim();
 if(nm&&nm!=='Other'&&nm.length<=30){if(LIST().indexOf(nm)<0)S.list.push(nm);e2.n=nm;e2.c=false;save();render()}}
@@ -206,6 +259,7 @@ document.addEventListener('click',function(ev){var b=ev.target.closest('button[d
 if(a==='in'||a==='up'){login(a);return}
 if(a==='fp'){forgot();return}
 if(a==='tl'){LOPEN=!LOPEN;render();return}
+if(a==='tc'){CH=!CH;drawCharts();return}
 if(a==='la'){var v=$('nl').value.trim();if(!v)return;if(LIST().indexOf(v)>=0){alert('That name is already in the list.');return}
 S.list.push(v);save();render();$('nl').focus();return}
 if(a==='lr'){var nm=LIST()[+b.dataset.n];if(!confirm('Remove “'+nm+'” from the list?'))return;S.list.splice(+b.dataset.n,1);save();render();return}
@@ -218,9 +272,9 @@ else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(fu
 else if(a==='addm'){var p=S.months[n-1].split('-');
 S.months.push(ym(new Date(+p[0],+p[1],1)));
 P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
-S.exp.forEach(function(e){e.a.push(e.a[n-1])});OPEN[n]=true}
+S.exp.forEach(function(e){e.a.push(e.a[n-1]);if(e.p)e.p.push(false)});OPEN[n]=true}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'?'))return;
-S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop()})}
+S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop();if(e.p)e.p.length=Math.min(e.p.length,n-1)})}
 else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
 while(j>=0&&j<S.exp.length&&S.exp[j].o!==S.exp[i].o)j+=d;
 if(j<0||j>=S.exp.length)return;
