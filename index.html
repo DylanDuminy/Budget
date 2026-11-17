@@ -70,6 +70,13 @@ input[type=checkbox]{width:20px;height:20px;padding:0;vertical-align:middle;acce
 .dl{flex:1;min-width:200px}
 .dr{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;margin:5px 0;font-size:14px}
 .dr i{width:12px;height:12px;border-radius:4px}
+.pnl{background:var(--bg);border-radius:10px;padding:10px;margin:2px 0 8px;text-align:left}
+.pbar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0 4px}
+.pbar>div{height:100%;background:var(--acc)}
+.li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.li span:first-child{flex:1}
+.addrow{display:flex;gap:8px;margin-top:8px}
+.sp2{display:flex;justify-content:space-between;gap:8px;font-size:14px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -117,7 +124,7 @@ input[type=checkbox]{width:20px;height:20px;padding:0;vertical-align:middle;acce
 <button class="btn" data-a="delm">Remove last month</button>
 <button class="btn" data-a="reset">Start over</button>
 </div>
-<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Bills are listed from biggest to smallest, and any bill you name yourself is added to the list for next time. Tick the box next to a bill when you have paid it. Use “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
+<p class="hint">Tap a month to open it. Pick a bill from the list or choose “Other…” to name your own. Bills are listed from biggest to smallest, and any bill you name yourself is added to the list for next time. Tick the box next to a bill when you have paid it. Tap the arrow on Food, Meat or a loan to plan your shopping or track the loan. Use “Paid by” to move a bill to the other person. Everything saves to your account automatically.</p>
 </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -135,7 +142,7 @@ function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYea
 return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,list:PRE.slice(),
 exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
 function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;if(!S.list)S.list=PRE.concat(S.custom||[]).filter(function(n,i,a){return a.indexOf(n)===i})}
-var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='',CM=0,CH=false,CUT=10;
+var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='',CM=0,CH=false,CUT=10,EXP={};
 function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true;CM=i<0?0:i}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 function ML(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleString('en-ZA',{month:'short',year:'numeric'})}
@@ -157,6 +164,24 @@ BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;fix();s
 function LIST(){return S.list||PRE}
 function nameCell(e,ei,p){var L=LIST(),cu=e.c||L.indexOf(e.n)<0;
 return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
+function btype(e){return/^(food|meat)$/i.test(e.n)?'shop':/loan/i.test(e.n)?'loan':''}
+function slist(e,i){if(!e.sl)e.sl=[];if(!e.sl[i])e.sl[i]=[];return e.sl[i]}
+function planned(e,i){var t=0;slist(e,i).forEach(function(x){t+=+x.v||0});return t}
+function paidSum(e){var t=0;(e.p||[]).forEach(function(v,j){if(v)t+=+e.a[j]||0});return t}
+function sumText(e,i,ty){var a=+e.a[i]||0;
+if(ty==='shop'){var pl=planned(e,i);if(!slist(e,i).length)return'Tap the arrow to plan what to buy';var l=a-pl;return R(pl)+' planned · '+(l>=0?R(l)+' left':R(-l)+' over')}
+var tot=+e.total||0;return tot?R(Math.max(0,tot-paidSum(e)))+' left to pay':'Tap the arrow to track this loan'}
+function stats(e,i,ty){var a=+e.a[i]||0,nm=esc(e.n.toLowerCase());
+if(ty==='shop'){var pl=planned(e,i),pc=a?Math.round(pl/a*100):0;
+return'<div class="pbar"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="hint" style="margin:0 0 6px">'+(a?pc+'% of your '+nm+' budget planned':'Set an amount for '+nm+' first')+'</div><div class="sp2"><span class="hint">Total planned</span><b>'+R(pl)+'</b></div>'}
+var tot=+e.total||0;if(!tot)return'<p class="hint" style="margin:0 0 8px">Type the total loan amount below to start tracking it.</p>';
+var pd=paidSum(e),left=Math.max(0,tot-pd),pc=Math.min(100,Math.round(pd/tot*100));
+return'<div class="pbar"><div style="width:'+pc+'%"></div></div><div class="sp2"><span>Paid so far <b>'+R(pd)+'</b></span><span>Left to pay <b>'+R(left)+'</b></span></div>'+(left>0?(a>0?'<div class="hint" style="margin:4px 0 8px">About '+Math.ceil(left/a)+' more payments at '+R(a)+' a month</div>':''):'<div class="hint" style="margin:4px 0 8px">This loan is paid off</div>')}
+function panel(e,ei,i,ty){var h='<tr><td colspan="3"><div class="pnl"><div id="pn-'+ei+'-'+i+'"></div>';
+if(ty==='shop'){h+=slist(e,i).map(function(it,k){return'<div class="li"><span>'+esc(it.n)+'</span><span>'+R(it.v)+'</span><button class="x" data-a="sd" data-e="'+ei+'" data-i="'+i+'" data-n="'+k+'" aria-label="Remove '+esc(it.n)+'">×</button></div>'}).join('');
+h+='<div class="addrow"><input id="sn-'+ei+'-'+i+'" placeholder="What are you buying?" maxlength="40" aria-label="Item"><input id="sp-'+ei+'-'+i+'" type="number" inputmode="numeric" placeholder="Price" style="width:90px;text-align:right" aria-label="Price"><button class="btn" data-a="sa" data-e="'+ei+'" data-i="'+i+'">Add</button></div>'}
+else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" value="'+(e.total||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down.</p>'}
+return h+'</div></td></tr>'}
 function sorted(p,i){return S.exp.map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a[i]||0)-(+a.e.a[i]||0)})}
 var TIPS=[[/food|grocer/i,'Plan meals for the week, shop with a list, buy staples in bulk, and use up leftovers.'],
 [/meat|butcher/i,'Buy meat in bulk on special, freeze portions, and stretch meals with beans, rice or vegetables.'],
@@ -204,8 +229,8 @@ if(a&&a.dataset&&a.dataset.k){q=a.tagName.toLowerCase()+'[data-k="'+a.dataset.k+
 render();if(q){var el=document.querySelector(q);if(el)el.focus()}}
 function person(p,i){
 var h='<h3>'+esc(S.names[p])+' pays</h3><table><tr><td><b>Salary</b></td><td class="am"><input type="number" inputmode="numeric" data-k="inc" data-p="'+p+'" data-i="'+i+'" value="'+S.inc[p][i]+'" aria-label="Salary"></td><td></td></tr>';
-sorted(p,i).forEach(function(x){var e=x.e,ei=x.ei;
-h+='<tr'+(e.p&&e.p[i]?' class="paid"':'')+'><td class="nm">'+nameCell(e,ei,p)+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap"><input type="checkbox" data-k="paid" data-e="'+ei+'" data-i="'+i+'"'+(e.p&&e.p[i]?' checked':'')+' aria-label="Paid" title="Tick when paid"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'});
+sorted(p,i).forEach(function(x){var e=x.e,ei=x.ei,ty=btype(e),op=!!EXP[x.ei+'-'+i];
+h+='<tr'+(e.p&&e.p[i]?' class="paid"':'')+'><td class="nm">'+nameCell(e,ei,p)+(ty?'<div class="hint" id="sm-'+ei+'-'+i+'" style="margin:4px 0 0"></div>':'')+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap">'+(ty?'<button class="x" data-a="tg" data-e="'+ei+'" data-i="'+i+'" aria-expanded="'+op+'" aria-label="Show details" title="Details">'+(op?'▴':'▾')+'</button>':'')+'<input type="checkbox" data-k="paid" data-e="'+ei+'" data-i="'+i+'"'+(e.p&&e.p[i]?' checked':'')+' aria-label="Paid" title="Tick when paid"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'+(ty&&op?panel(e,ei,i,ty):'')});
 h+='<tr><td><b>Put into savings</b></td><td class="am"><input type="number" inputmode="numeric" data-k="sav" data-p="'+p+'" data-i="'+i+'" value="'+S.sav[p][i]+'" aria-label="Put into savings"></td><td></td></tr>';
 h+='<tr class="tot"><td>Total bills</td><td id="t-'+p+'-'+i+'"></td><td></td></tr><tr class="left"><td>Left over</td><td id="l-'+p+'-'+i+'"></td><td></td></tr></table>';
 return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
@@ -223,6 +248,7 @@ var cp=0;S.exp.forEach(function(e){if(!(e.p&&e.p[i]))cp+=+e.a[i]||0});$('cp-'+i)
 run+=cv;
 $('ci-'+i).textContent=R(ci);$('ce-'+i).textContent=R(ce);$('cv-'+i).textContent=R(cv);
 $('cl-'+i).innerHTML=pill(ci-ce-cv);$('cs-'+i).textContent=R(run);$('ml-'+i).innerHTML=pill(ci-ce-cv)});
+S.exp.forEach(function(e,ei){var ty=btype(e);if(!ty)return;S.months.forEach(function(m,i){var a=$('sm-'+ei+'-'+i);if(a)a.textContent=sumText(e,i,ty);var b=$('pn-'+ei+'-'+i);if(b)b.innerHTML=stats(e,i,ty)})});
 $('tsv').textContent=R(run);drawCharts()}
 function render(){
 $('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
@@ -235,6 +261,7 @@ $('board').addEventListener('input',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='inc')S.inc[+t.dataset.p][+t.dataset.i]=+t.value||0;
 else if(k==='sav')S.sav[+t.dataset.p][+t.dataset.i]=+t.value||0;
 else if(k==='start')S.start=+t.value||0;
+else if(k==='ltotal'){S.exp[+t.dataset.e].total=+t.value||0;document.querySelectorAll('input[data-k="ltotal"][data-e="'+t.dataset.e+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
 else if(k==='amt')S.exp[+t.dataset.e].a[+t.dataset.i]=+t.value||0;
 else if(k==='name'){S.exp[+t.dataset.e].n=t.value;
 document.querySelectorAll('input[data-k="name"][data-e="'+t.dataset.e+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
@@ -272,6 +299,11 @@ if(a==='in'||a==='up'){login(a);return}
 if(a==='fp'){forgot();return}
 if(a==='tl'){LOPEN=!LOPEN;render();return}
 if(a==='tc'){CH=!CH;drawCharts();return}
+if(a==='tg'){var k2=b.dataset.e+'-'+b.dataset.i;EXP[k2]=!EXP[k2];render();return}
+if(a==='sa'){var ee=+b.dataset.e,ii=+b.dataset.i,nn=$('sn-'+ee+'-'+ii),pp=$('sp-'+ee+'-'+ii),nm2=nn.value.trim(),pv=+pp.value;
+if(!nm2){nn.focus();return}
+slist(S.exp[ee],ii).push({n:nm2,v:pv>0?pv:0});save();render();var f2=$('sn-'+ee+'-'+ii);if(f2)f2.focus();return}
+if(a==='sd'){slist(S.exp[+b.dataset.e],+b.dataset.i).splice(+b.dataset.n,1);save();render();return}
 if(a==='la'){var v=$('nl').value.trim();if(!v)return;if(LIST().indexOf(v)>=0){alert('That name is already in the list.');return}
 S.list.push(v);save();render();$('nl').focus();return}
 if(a==='lr'){var nm=LIST()[+b.dataset.n];if(!confirm('Remove “'+nm+'” from the list?'))return;S.list.splice(+b.dataset.n,1);save();render();return}
@@ -286,7 +318,7 @@ S.months.push(ym(new Date(+p[0],+p[1],1)));
 P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
 S.exp.forEach(function(e){e.a.push(e.a[n-1]);if(e.p)e.p.push(false)});OPEN[n]=true}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'?'))return;
-S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop();if(e.p)e.p.length=Math.min(e.p.length,n-1)})}
+S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop();if(e.p)e.p.length=Math.min(e.p.length,n-1);if(e.sl)e.sl.length=Math.min(e.sl.length,n-1)})}
 else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
 while(j>=0&&j<S.exp.length&&S.exp[j].o!==S.exp[i].o)j+=d;
 if(j<0||j>=S.exp.length)return;
@@ -294,6 +326,7 @@ var tmp=S.exp[i];S.exp[i]=S.exp[j];S.exp[j]=tmp}
 else if(a==='reset'){if(!confirm('Clear everything and start with an empty budget?'))return;S=fresh();setOpen()}
 save();render()});
 document.addEventListener('keydown',function(ev){if(ev.key==='Enter'&&ev.target.id==='nl'){ev.preventDefault();var b=document.querySelector('button[data-a="la"]');if(b)b.click()}});
+document.addEventListener('keydown',function(ev){var m2=/^s[np]-(\d+)-(\d+)$/.exec(ev.target.id||'');if(ev.key==='Enter'&&m2){ev.preventDefault();var b2=document.querySelector('button[data-a="sa"][data-e="'+m2[1]+'"][data-i="'+m2[2]+'"]');if(b2)b2.click()}});
 $('pw').addEventListener('keydown',function(ev){if(ev.key==='Enter')login('in')});
 
 /* ---------- starting up ---------- */
