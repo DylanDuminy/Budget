@@ -180,7 +180,7 @@ return'<div class="pbar"><div style="width:'+pc+'%"></div></div><div class="sp2"
 function panel(e,ei,i,ty){var h='<tr><td colspan="3"><div class="pnl"><div id="pn-'+ei+'-'+i+'"></div>';
 if(ty==='shop'){h+=slist(e,i).map(function(it,k){return'<div class="li"><span>'+esc(it.n)+'</span><span>'+R(it.v)+'</span><button class="x" data-a="sd" data-e="'+ei+'" data-i="'+i+'" data-n="'+k+'" aria-label="Remove '+esc(it.n)+'">×</button></div>'}).join('');
 h+='<div class="addrow"><input id="sn-'+ei+'-'+i+'" placeholder="What are you buying?" maxlength="40" aria-label="Item"><input id="sp-'+ei+'-'+i+'" type="number" inputmode="numeric" placeholder="Price" style="width:90px;text-align:right" aria-label="Price"><button class="btn" data-a="sa" data-e="'+ei+'" data-i="'+i+'">Add</button></div>'}
-else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" value="'+(e.total||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down.</p>'}
+else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" value="'+(e.total||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down. When you add a new month, the month before is ticked as paid for you.</p>'}
 return h+'</div></td></tr>'}
 function sorted(p,i){return S.exp.map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a[i]||0)-(+a.e.a[i]||0)})}
 var TIPS=[[/food|grocer/i,'Plan meals for the week, shop with a list, buy staples in bulk, and use up leftovers.'],
@@ -316,7 +316,8 @@ else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(fu
 else if(a==='addm'){var p=S.months[n-1].split('-');
 S.months.push(ym(new Date(+p[0],+p[1],1)));
 P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
-S.exp.forEach(function(e){e.a.push(e.a[n-1]);if(e.p)e.p.push(false)});OPEN[n]=true}
+S.exp.forEach(function(e){e.a.push(e.a[n-1]);if(e.p)e.p.push(false)});
+S.exp.forEach(function(e){if(btype(e)==='loan'){if(!e.p)e.p=[];e.p[n-1]=true}});OPEN[n]=true}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'?'))return;
 S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop();if(e.p)e.p.length=Math.min(e.p.length,n-1);if(e.sl)e.sl.length=Math.min(e.sl.length,n-1)})}
 else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
