@@ -182,7 +182,10 @@ BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;fix();s
 function LIST(){return S.list||PRE}
 function nameCell(e,ei,p,i){var L=LIST(),cu=e.c||L.indexOf(e.n)<0,d=' data-e="'+ei+'" data-i="'+i+'"';
 return'<div class="row"><select data-k="pick"'+d+' aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name"'+d+' value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner"'+d+' aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
-function btype(e){return/^(food|meat)$/i.test(e.n)?'shop':/loan/i.test(e.n)?'loan':''}
+function btype(e){return/^(food|meat)$/i.test(e.n)?'shop':(e.loan||/loan/i.test(e.n))?'loan':''}
+function allLoans(e){var L=[];S.mb.forEach(function(B){if(B.indexOf(e)>=0)L=B.filter(function(x){return btype(x)==='loan'})});
+if(L.length<2)return'';var left=0,miss=0;L.forEach(function(x){var t=loanTotal(x);if(t)left+=Math.max(0,t-paidSum(x));else miss++});
+return'<div class="hint" style="margin:0 0 8px">You have '+L.length+' loans. All together you still owe <b>'+R(left)+'</b>.'+(miss?' Loans with no total typed yet are not counted.':'')+'</div>'}
 function slist(e){if(!e.sl)e.sl=[];return e.sl}
 function planned(e){var t=0;slist(e).forEach(function(x){t+=+x.v||0});return t}
 function paidSum(e){var t=0;S.mb.forEach(function(B){B.forEach(function(x){if(x.id===e.id&&x.p)t+=+x.a||0})});return t}
@@ -193,13 +196,13 @@ var tot=loanTotal(e);return tot?R(Math.max(0,tot-paidSum(e)))+' left to pay':'Ta
 function stats(e,ty){var a=+e.a||0,nm=esc(e.n.toLowerCase());
 if(ty==='shop'){var pl=planned(e),pc=a?Math.round(pl/a*100):0;
 return'<div class="pbar"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="hint" style="margin:0 0 6px">'+(a?pc+'% of your '+nm+' budget planned':'Set an amount for '+nm+' first')+'</div><div class="sp2"><span class="hint">Total planned</span><b>'+R(pl)+'</b></div>'}
-var tot=loanTotal(e);if(!tot)return'<p class="hint" style="margin:0 0 8px">Type the total loan amount below to start tracking it.</p>';
+var tot=loanTotal(e),al=allLoans(e);if(!tot)return al+'<p class="hint" style="margin:0 0 8px">Type the total loan amount below to start tracking it.</p>';
 var pd=paidSum(e),left=Math.max(0,tot-pd),pc=Math.min(100,Math.round(pd/tot*100));
-return'<div class="pbar"><div style="width:'+pc+'%"></div></div><div class="sp2"><span>Paid so far <b>'+R(pd)+'</b></span><span>Left to pay <b>'+R(left)+'</b></span></div>'+(left>0?(a>0?'<div class="hint" style="margin:4px 0 8px">About '+Math.ceil(left/a)+' more payments at '+R(a)+' a month</div>':''):'<div class="hint" style="margin:4px 0 8px">This loan is paid off</div>')}
+return al+'<div class="pbar"><div style="width:'+pc+'%"></div></div><div class="sp2"><span>Paid so far <b>'+R(pd)+'</b></span><span>Left to pay <b>'+R(left)+'</b></span></div>'+(left>0?(a>0?'<div class="hint" style="margin:4px 0 8px">About '+Math.ceil(left/a)+' more payments at '+R(a)+' a month</div>':''):'<div class="hint" style="margin:4px 0 8px">This loan is paid off</div>')}
 function panel(e,ei,i,ty){var h='<tr><td colspan="3"><div class="pnl"><div id="pn-'+ei+'-'+i+'"></div>';
 if(ty==='shop'){h+=slist(e).map(function(it,k){return{it:it,k:k}}).sort(function(a,b){return(+b.it.v||0)-(+a.it.v||0)}).map(function(x){var it=x.it,k=x.k;return'<div class="li"><span>'+esc(it.n)+'</span><span>'+R(it.v)+'</span><button class="x" data-a="sd" data-e="'+ei+'" data-i="'+i+'" data-n="'+k+'" aria-label="Remove '+esc(it.n)+'">×</button></div>'}).join('');
 h+='<div class="addrow"><input id="sn-'+ei+'-'+i+'" placeholder="What are you buying?" maxlength="40" aria-label="Item"><input id="sp-'+ei+'-'+i+'" type="number" inputmode="numeric" placeholder="Price" style="width:90px;text-align:right" aria-label="Price"><button class="btn" data-a="sa" data-e="'+ei+'" data-i="'+i+'">Add</button></div>'}
-else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" data-i="'+i+'" data-bid="'+e.id+'" value="'+(S.tot[e.id]||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down. When you add a new month, the month before is ticked as paid for you.</p>'}
+else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" data-i="'+i+'" data-bid="'+e.id+'" value="'+(S.tot[e.id]||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down. When you add a new month, the month before is ticked as paid for you. Got more than one loan? Add another loan and give each one its own name and total.</p><div class="bar" style="margin-top:8px"><button class="btn" data-a="al" data-e="'+ei+'" data-i="'+i+'">Add another loan</button></div>'}
 return h+'</div></td></tr>'}
 function toTrash(o){o.at=Date.now();S.trash.unshift(o)}
 function purge(){var lim=Date.now()-35*864e5;S.trash=(S.trash||[]).filter(function(t){return t.at>lim})}
@@ -227,7 +230,7 @@ else if(t.type==='month'){var nl=S.months.length,lp=S.months[nl-1].split('-'),nk
 if(S.months.indexOf(t.m)>=0){alert('That month is already in your budget.');return}
 if(t.m!==nk){alert('This month can only come back right after '+ML(S.months[nl-1])+'.');return}
 S.months.push(t.m);P.forEach(function(q){S.inc[q].push(t.inc[q]);S.sav[q].push(t.sav[q])});
-S.mb.push(t.bills.map(function(b){return{id:b.id||uid(),n:b.n,o:b.o,a:+b.a||0,p:!!b.p,c:!!b.c,sl:b.sl||[]}}))}
+S.mb.push(t.bills.map(function(b){return{id:b.id||uid(),n:b.n,o:b.o,a:+b.a||0,p:!!b.p,c:!!b.c,loan:b.loan,sl:b.sl||[]}}))}
 else if(t.type==='all'){var tr=S.trash.filter(function(x){return x!==t});S=t.data;fix();S.trash=tr;setOpen();save();render();return}
 S.trash.splice(k,1);save();render()}
 function sorted(p,i){return S.mb[i].map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a||0)-(+a.e.a||0)})}
@@ -330,6 +333,9 @@ if(a==='tl'){LOPEN=!LOPEN;render();return}
 if(a==='tc'){CH=!CH;drawCharts();return}
 if(a==='tt'){TOPEN=!TOPEN;render();return}
 if(a==='tr'){restoreTrash(+b.dataset.n);return}
+if(a==='al'){var src=bill(b),mi1=+b.dataset.i,LB=S.mb[mi1],cnt=LB.filter(function(x){return btype(x)==='loan'}).length;
+var nb={id:uid(),n:'Loan '+(cnt+1),loan:true,c:true,o:src.o,a:0,p:false,sl:[]};LB.push(nb);EXP[nb.id+'-'+mi1]=true;save();render();
+var nf=document.querySelector('input[data-k="name"][data-e="'+(LB.length-1)+'"][data-i="'+mi1+'"]');if(nf){nf.focus();nf.select()}return}
 if(a==='tf'){var tk=+b.dataset.n;if(!confirm('Delete this for good? You will not be able to get it back.'))return;S.trash.splice(tk,1);save();render();return}
 if(a==='tx'){if(!confirm('Delete everything in Recently deleted for good? You will not be able to get any of it back.'))return;S.trash=[];save();render();return}
 if(a==='tg'){var k2=bill(b).id+'-'+b.dataset.i;EXP[k2]=!EXP[k2];render();return}
@@ -350,7 +356,7 @@ else if(a==='addm'){var p=S.months[n-1].split('-');
 S.months.push(ym(new Date(+p[0],+p[1],1)));
 P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
 S.mb[n-1].forEach(function(e){if(btype(e)==='loan')e.p=true});
-S.mb.push(S.mb[n-1].map(function(e){return{id:e.id,n:e.n,o:e.o,a:e.a,p:false,c:e.c,sl:[]}}));OPEN[n]=true}
+S.mb.push(S.mb[n-1].map(function(e){return{id:e.id,n:e.n,o:e.o,a:e.a,p:false,c:e.c,loan:e.loan,sl:[]}}));OPEN[n]=true}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'? You can get it back from Recently deleted.'))return;
 toTrash({type:'month',m:S.months[n-1],inc:P.map(function(q){return S.inc[q][n-1]}),sav:P.map(function(q){return S.sav[q][n-1]}),bills:JSON.parse(JSON.stringify(S.mb[n-1]))});
 S.months.pop();S.mb.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()})}
