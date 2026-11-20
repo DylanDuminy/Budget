@@ -142,11 +142,23 @@ var SUPABASE_KEY='sb_publishable_tCk0kStAxNkw2MAvzsAMaA_z7NIG0zi';
 var P=[0,1];
 var PRE=['Rent','Power','Food','Meat','Dog food','Wifi','House stuff','Worker','Car','Nails','Loan','Insurance','Fuel','Phone'];
 function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function uid(){return'b'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 var now=new Date(),CUR=ym(now);
+/* Each month has its own list of bills: S.mb[monthIndex] = [{id,n,o,a,p,c,sl}] */
 function fresh(){var m=[0,1,2].map(function(k){return ym(new Date(now.getFullYear(),now.getMonth()+k,1))});
-return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,list:PRE.slice(),trash:[],
-exp:[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{n:e[0],o:e[1],a:[0,0,0]}})}}
-function fix(){if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;if(!S.list)S.list=PRE.concat(S.custom||[]).filter(function(n,i,a){return a.indexOf(n)===i});if(!S.trash)S.trash=[];purge()}
+var base=[['Rent',0],['Power',0],['Food',0],['Wifi',0],['Car',0],['Loan',1]].map(function(e){return{id:uid(),n:e[0],o:e[1]}});
+return{names:['Partner 1','Partner 2'],months:m,inc:[[0,0,0],[0,0,0]],sav:[[0,0,0],[0,0,0]],start:0,list:PRE.slice(),trash:[],tot:{},
+mb:m.map(function(){return base.map(function(b){return{id:b.id,n:b.n,o:b.o,a:0,p:false,sl:[]}})})}}
+function fix(){
+if(S.exp&&!S.mb){var ids=S.exp.map(function(e){return e.id||uid()});S.tot={};
+S.exp.forEach(function(e,k){if(e.total)S.tot[ids[k]]=+e.total});
+S.mb=S.months.map(function(m,i){return S.exp.map(function(e,k){return{id:ids[k],n:e.n,o:e.o,a:+(e.a&&e.a[i])||0,p:!!(e.p&&e.p[i]),c:!!e.c,sl:(e.sl&&e.sl[i])?e.sl[i]:[]}})});delete S.exp}
+if(!S.mb)S.mb=[];while(S.mb.length<S.months.length)S.mb.push([]);
+if(!S.tot)S.tot={};
+S.mb.forEach(function(B){B.forEach(function(b){if(!b.id)b.id=uid();if(!b.sl)b.sl=[]})});
+if(!S.sav)S.sav=[0,1].map(function(){return S.months.map(function(){return 0})});if(S.start==null)S.start=0;
+if(!S.list)S.list=PRE.concat(S.custom||[]).filter(function(n,i,a){return a.indexOf(n)===i});
+if(!S.trash)S.trash=[];S.trash.forEach(function(t){if(t.type==='bill'&&t.e)t.type='billall'});purge()}
 var S=fresh(),OPEN={},UID=null,T=null,sb=null,BID=null,CODE='',LAST='',CM=0,CH=false,CUT=10,EXP={},TOPEN=false;
 function setOpen(){OPEN={};var i=S.months.indexOf(CUR);OPEN[i<0?0:i]=true;CM=i<0?0:i}
 function R(n){return(n<0?'-':'')+'R'+Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -167,30 +179,32 @@ BID=r.data.id;CODE=r.data.join_code;LAST=r.data.updated_at;S=r.data.data;fix();s
 
 /* ---------- drawing the budget ---------- */
 function LIST(){return S.list||PRE}
-function nameCell(e,ei,p){var L=LIST(),cu=e.c||L.indexOf(e.n)<0;
-return'<div class="row"><select data-k="pick" data-e="'+ei+'" aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name" data-e="'+ei+'" value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner" data-e="'+ei+'" aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
+function nameCell(e,ei,p,i){var L=LIST(),cu=e.c||L.indexOf(e.n)<0,d=' data-e="'+ei+'" data-i="'+i+'"';
+return'<div class="row"><select data-k="pick"'+d+' aria-label="Bill">'+L.map(function(n){return'<option'+(!cu&&n===e.n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'<option value="__other"'+(cu?' selected':'')+'>Other…</option></select>'+(cu?'<input data-k="name"'+d+' value="'+esc(e.n)+'" placeholder="Name this bill" aria-label="Bill name">':'')+'<select class="ow" data-k="owner"'+d+' aria-label="Who pays">'+P.map(function(q){return'<option value="'+q+'"'+(q===p?' selected':'')+'>Paid by '+esc(S.names[q])+'</option>'}).join('')+'</select></div>'}
 function btype(e){return/^(food|meat)$/i.test(e.n)?'shop':/loan/i.test(e.n)?'loan':''}
-function slist(e,i){if(!e.sl)e.sl=[];if(!e.sl[i])e.sl[i]=[];return e.sl[i]}
-function planned(e,i){var t=0;slist(e,i).forEach(function(x){t+=+x.v||0});return t}
-function paidSum(e){var t=0;(e.p||[]).forEach(function(v,j){if(v)t+=+e.a[j]||0});return t}
-function sumText(e,i,ty){var a=+e.a[i]||0;
-if(ty==='shop'){var pl=planned(e,i);if(!slist(e,i).length)return'Tap the arrow to plan what to buy';var l=a-pl;return R(pl)+' planned · '+(l>=0?R(l)+' left':R(-l)+' over')}
-var tot=+e.total||0;return tot?R(Math.max(0,tot-paidSum(e)))+' left to pay':'Tap the arrow to track this loan'}
-function stats(e,i,ty){var a=+e.a[i]||0,nm=esc(e.n.toLowerCase());
-if(ty==='shop'){var pl=planned(e,i),pc=a?Math.round(pl/a*100):0;
+function slist(e){if(!e.sl)e.sl=[];return e.sl}
+function planned(e){var t=0;slist(e).forEach(function(x){t+=+x.v||0});return t}
+function paidSum(e){var t=0;S.mb.forEach(function(B){B.forEach(function(x){if(x.id===e.id&&x.p)t+=+x.a||0})});return t}
+function loanTotal(e){return+S.tot[e.id]||0}
+function sumText(e,ty){var a=+e.a||0;
+if(ty==='shop'){var pl=planned(e);if(!slist(e).length)return'Tap the arrow to plan what to buy';var l=a-pl;return R(pl)+' planned · '+(l>=0?R(l)+' left':R(-l)+' over')}
+var tot=loanTotal(e);return tot?R(Math.max(0,tot-paidSum(e)))+' left to pay':'Tap the arrow to track this loan'}
+function stats(e,ty){var a=+e.a||0,nm=esc(e.n.toLowerCase());
+if(ty==='shop'){var pl=planned(e),pc=a?Math.round(pl/a*100):0;
 return'<div class="pbar"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="hint" style="margin:0 0 6px">'+(a?pc+'% of your '+nm+' budget planned':'Set an amount for '+nm+' first')+'</div><div class="sp2"><span class="hint">Total planned</span><b>'+R(pl)+'</b></div>'}
-var tot=+e.total||0;if(!tot)return'<p class="hint" style="margin:0 0 8px">Type the total loan amount below to start tracking it.</p>';
+var tot=loanTotal(e);if(!tot)return'<p class="hint" style="margin:0 0 8px">Type the total loan amount below to start tracking it.</p>';
 var pd=paidSum(e),left=Math.max(0,tot-pd),pc=Math.min(100,Math.round(pd/tot*100));
 return'<div class="pbar"><div style="width:'+pc+'%"></div></div><div class="sp2"><span>Paid so far <b>'+R(pd)+'</b></span><span>Left to pay <b>'+R(left)+'</b></span></div>'+(left>0?(a>0?'<div class="hint" style="margin:4px 0 8px">About '+Math.ceil(left/a)+' more payments at '+R(a)+' a month</div>':''):'<div class="hint" style="margin:4px 0 8px">This loan is paid off</div>')}
 function panel(e,ei,i,ty){var h='<tr><td colspan="3"><div class="pnl"><div id="pn-'+ei+'-'+i+'"></div>';
-if(ty==='shop'){h+=slist(e,i).map(function(it,k){return{it:it,k:k}}).sort(function(a,b){return(+b.it.v||0)-(+a.it.v||0)}).map(function(x){var it=x.it,k=x.k;return'<div class="li"><span>'+esc(it.n)+'</span><span>'+R(it.v)+'</span><button class="x" data-a="sd" data-e="'+ei+'" data-i="'+i+'" data-n="'+k+'" aria-label="Remove '+esc(it.n)+'">×</button></div>'}).join('');
+if(ty==='shop'){h+=slist(e).map(function(it,k){return{it:it,k:k}}).sort(function(a,b){return(+b.it.v||0)-(+a.it.v||0)}).map(function(x){var it=x.it,k=x.k;return'<div class="li"><span>'+esc(it.n)+'</span><span>'+R(it.v)+'</span><button class="x" data-a="sd" data-e="'+ei+'" data-i="'+i+'" data-n="'+k+'" aria-label="Remove '+esc(it.n)+'">×</button></div>'}).join('');
 h+='<div class="addrow"><input id="sn-'+ei+'-'+i+'" placeholder="What are you buying?" maxlength="40" aria-label="Item"><input id="sp-'+ei+'-'+i+'" type="number" inputmode="numeric" placeholder="Price" style="width:90px;text-align:right" aria-label="Price"><button class="btn" data-a="sa" data-e="'+ei+'" data-i="'+i+'">Add</button></div>'}
-else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" value="'+(e.total||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down. When you add a new month, the month before is ticked as paid for you.</p>'}
+else{h+='<label style="font-size:13px;color:var(--mut)" for="lt-'+ei+'-'+i+'">Total loan amount</label><input id="lt-'+ei+'-'+i+'" type="number" inputmode="numeric" data-k="ltotal" data-e="'+ei+'" data-i="'+i+'" data-bid="'+e.id+'" value="'+(S.tot[e.id]||'')+'" placeholder="How much do you owe in total?"><p class="hint" style="margin:6px 0 0">Tick the box next to this loan each month you pay it, and the amount left goes down. When you add a new month, the month before is ticked as paid for you.</p>'}
 return h+'</div></td></tr>'}
 function toTrash(o){o.at=Date.now();S.trash.unshift(o)}
 function purge(){var lim=Date.now()-35*864e5;S.trash=(S.trash||[]).filter(function(t){return t.at>lim})}
 function describe(t){
-if(t.type==='bill')return'Bill: '+t.e.n+' ('+S.names[t.e.o]+')';
+if(t.type==='bill')return'Bill: '+t.b.n+' ('+S.names[t.b.o]+') in '+ML(t.m);
+if(t.type==='billall')return'Bill: '+t.e.n+' ('+S.names[t.e.o]+') in all months';
 if(t.type==='item')return'Shopping item: '+t.it.n+' ('+R(t.it.v)+') on '+t.bill+', '+ML(t.month);
 if(t.type==='name')return'Bill list name: '+t.name;
 if(t.type==='month')return'Month: '+ML(t.m);
@@ -199,31 +213,32 @@ function trashHTML(){purge();var h='<div class="card pad"><b>Recently deleted</b
 h+=S.trash.length?S.trash.map(function(t,k){var d=Math.floor((Date.now()-t.at)/864e5);return'<div class="li"><span>'+esc(describe(t))+' <small class="hint">· '+(d<1?'today':d+(d===1?' day ago':' days ago'))+'</small></span><button class="btn" data-a="tr" data-n="'+k+'">Restore</button></div>'}).join(''):'<p class="hint">Nothing has been deleted lately.</p>';
 return h+'</div>'}
 function restoreTrash(k){var t=S.trash[k];if(!t)return;
-if(t.type==='bill'){var e=t.e,n=S.months.length;while(e.a.length<n)e.a.push(0);e.a.length=n;S.exp.splice(Math.min(t.idx,S.exp.length),0,e)}
-else if(t.type==='item'){var bl=S.exp.filter(function(x){return x.n===t.bill})[0],mi=S.months.indexOf(t.month);
-if(!bl||mi<0){alert('This cannot go back yet, because the bill or the month is no longer there. Restore the bill or month first.');return}
-slist(bl,mi).push(t.it)}
+if(t.type==='bill'){var mi=S.months.indexOf(t.m);
+if(mi<0){alert('That month is no longer in your budget. Restore the month first.');return}
+S.mb[mi].splice(Math.min(t.idx,S.mb[mi].length),0,t.b)}
+else if(t.type==='billall'){var id=uid(),e=t.e;if(e.total)S.tot[id]=+e.total;
+S.months.forEach(function(m,i){S.mb[i].splice(Math.min(t.idx,S.mb[i].length),0,{id:id,n:e.n,o:e.o,a:+(e.a&&e.a[i])||0,p:!!(e.p&&e.p[i]),c:!!e.c,sl:(e.sl&&e.sl[i])||[]})})}
+else if(t.type==='item'){var mi2=S.months.indexOf(t.month),bl=mi2<0?null:S.mb[mi2].filter(function(x){return x.n===t.bill})[0];
+if(!bl){alert('This cannot go back yet, because the bill or the month is no longer there. Restore the bill or month first.');return}
+slist(bl).push(t.it)}
 else if(t.type==='name'){if(LIST().indexOf(t.name)<0)S.list.splice(Math.min(t.idx,S.list.length),0,t.name)}
 else if(t.type==='month'){var nl=S.months.length,lp=S.months[nl-1].split('-'),nk=ym(new Date(+lp[0],+lp[1],1));
 if(S.months.indexOf(t.m)>=0){alert('That month is already in your budget.');return}
 if(t.m!==nk){alert('This month can only come back right after '+ML(S.months[nl-1])+'.');return}
 S.months.push(t.m);P.forEach(function(q){S.inc[q].push(t.inc[q]);S.sav[q].push(t.sav[q])});
-var used={};S.exp.forEach(function(e){var f=-1;t.bills.forEach(function(b,j){if(f<0&&!used[j]&&b.n===e.n&&b.o===e.o)f=j});
-var b=f>=0?t.bills[f]:null;if(f>=0)used[f]=true;e.a.push(b?b.a:0);if(!e.p)e.p=[];while(e.p.length<nl)e.p.push(false);e.p[nl]=b?b.p:false;
-if(b&&b.sl&&b.sl.length){if(!e.sl)e.sl=[];e.sl[nl]=b.sl}})}
+S.mb.push(t.bills.map(function(b){return{id:b.id||uid(),n:b.n,o:b.o,a:+b.a||0,p:!!b.p,c:!!b.c,sl:b.sl||[]}}))}
 else if(t.type==='all'){var tr=S.trash.filter(function(x){return x!==t});S=t.data;fix();S.trash=tr;setOpen();save();render();return}
 S.trash.splice(k,1);save();render()}
-function sorted(p,i){return S.exp.map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a[i]||0)-(+a.e.a[i]||0)})}
+function sorted(p,i){return S.mb[i].map(function(e,ei){return{e:e,ei:ei}}).filter(function(x){return x.e.o===p}).sort(function(a,b){return(+b.e.a||0)-(+a.e.a||0)})}
 function K(n){n=Math.round(n);return Math.abs(n)>=1000?(Math.round(n/100)/10)+'k':String(n)}
 function drawCharts(){var el=$('charts');if(!el)return;if(!CH){el.innerHTML='';return}
 var n=S.months.length;if(CM>=n)CM=n-1;
-var data=S.months.map(function(m,i){var ci=0,ce=0,cv=0;P.forEach(function(p){ci+=+S.inc[p][i]||0;cv+=+S.sav[p][i]||0});S.exp.forEach(function(e){ce+=+e.a[i]||0});return{m:m,ci:ci,ce:ce,cv:cv}});
+var data=S.months.map(function(m,i){var ci=0,ce=0,cv=0;P.forEach(function(p){ci+=+S.inc[p][i]||0;cv+=+S.sav[p][i]||0});S.mb[i].forEach(function(e){ce+=+e.a||0});return{m:m,ci:ci,ce:ce,cv:cv}});
 var mx=Math.max.apply(null,data.map(function(d){return Math.max(d.ci,d.ce,d.cv)}).concat([1]));
 function bar(v,c,l){return'<div class="vb" title="'+l+': '+R(v)+'" style="height:'+Math.max(2,Math.round(v/mx*150))+'px;background:'+c+'"></div>'}
 var h='<div class="card pad"><b>Charts</b><div class="leg"><span><i style="background:var(--acc)"></i>Income</span><span><i style="background:var(--neg)"></i>Bills</span><span><i style="background:var(--pos)"></i>Savings</span></div><div class="grps">'+
 data.map(function(d){return'<div class="grp"><div class="vc">'+bar(d.ci,'var(--acc)','Income')+bar(d.ce,'var(--neg)','Bills')+bar(d.cv,'var(--pos)','Savings')+'</div><div class="gl">'+ML(d.m)+'</div><div class="gs">'+K(d.ci)+' / '+K(d.ce)+' / '+K(d.cv)+'</div></div>'}).join('')+'</div>';
-var d=data[CM],bills=S.exp.map(function(e){return{n:e.n,v:+e.a[CM]||0}}).filter(function(b){return b.v>0}).sort(function(a,b){return b.v-a.v});
-var top=bills.length?bills[0].v:1;
+var d=data[CM],bills=S.mb[CM].map(function(e){return{n:e.n,v:+e.a||0}}).filter(function(b){return b.v>0}).sort(function(a,b){return b.v-a.v});
 h+='<h3>Where the money goes</h3><select data-k="cm" aria-label="Month" style="width:auto">'+S.months.map(function(m,i){return'<option value="'+i+'"'+(i===CM?' selected':'')+'>'+ML(m)+'</option>'}).join('')+'</select>';
 if(bills.length){var COL=['#38bdf8','#0369a1','#7dd3fc','#0c4a6e','#0ea5e9','#94a3b8','#1d4ed8','#64748b','#334155'],tot=0,segs=bills.slice(0,8).map(function(b){return{n:b.n,v:b.v}}),rest=0;
 bills.slice(8).forEach(function(b){rest+=b.v});if(rest)segs.push({n:'Other bills',v:rest});
@@ -241,26 +256,26 @@ if(a&&a.dataset&&a.dataset.k){q=a.tagName.toLowerCase()+'[data-k="'+a.dataset.k+
 render();if(q){var el=document.querySelector(q);if(el)el.focus()}}
 function person(p,i){
 var h='<h3>'+esc(S.names[p])+' pays</h3><table><tr><td><b>Salary</b></td><td class="am"><input type="number" inputmode="numeric" data-k="inc" data-p="'+p+'" data-i="'+i+'" value="'+S.inc[p][i]+'" aria-label="Salary"></td><td></td></tr>';
-sorted(p,i).forEach(function(x){var e=x.e,ei=x.ei,ty=btype(e),op=!!EXP[x.ei+'-'+i];
-h+='<tr'+(e.p&&e.p[i]?' class="paid"':'')+'><td class="nm">'+nameCell(e,ei,p)+(ty?'<div class="hint" id="sm-'+ei+'-'+i+'" style="margin:4px 0 0"></div>':'')+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a[i]+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap">'+(ty?'<button class="x" data-a="tg" data-e="'+ei+'" data-i="'+i+'" aria-expanded="'+op+'" aria-label="Show details" title="Details">'+(op?'▴':'▾')+'</button>':'')+'<input type="checkbox" data-k="paid" data-e="'+ei+'" data-i="'+i+'"'+(e.p&&e.p[i]?' checked':'')+' aria-label="Paid" title="Tick when paid"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'+(ty&&op?panel(e,ei,i,ty):'')});
+sorted(p,i).forEach(function(x){var e=x.e,ei=x.ei,ty=btype(e),op=!!EXP[e.id+'-'+i];
+h+='<tr'+(e.p?' class="paid"':'')+'><td class="nm">'+nameCell(e,ei,p,i)+(ty?'<div class="hint" id="sm-'+ei+'-'+i+'" style="margin:4px 0 0"></div>':'')+'</td><td class="am"><input type="number" inputmode="numeric" data-k="amt" data-e="'+ei+'" data-i="'+i+'" value="'+e.a+'" aria-label="'+esc(e.n)+' amount"></td><td style="white-space:nowrap">'+(ty?'<button class="x" data-a="tg" data-e="'+ei+'" data-i="'+i+'" aria-expanded="'+op+'" aria-label="Show details" title="Details">'+(op?'▴':'▾')+'</button>':'')+'<input type="checkbox" data-k="paid" data-e="'+ei+'" data-i="'+i+'"'+(e.p?' checked':'')+' aria-label="Paid" title="Tick when paid"><button class="x" style="font-size:20px" data-a="del" data-e="'+ei+'" data-i="'+i+'" aria-label="Remove bill" title="Remove">×</button></td></tr>'+(ty&&op?panel(e,ei,i,ty):'')});
 h+='<tr><td><b>Put into savings</b></td><td class="am"><input type="number" inputmode="numeric" data-k="sav" data-p="'+p+'" data-i="'+i+'" value="'+S.sav[p][i]+'" aria-label="Put into savings"></td><td></td></tr>';
 h+='<tr class="tot"><td>Total bills</td><td id="t-'+p+'-'+i+'"></td><td></td></tr><tr class="left"><td>Left over</td><td id="l-'+p+'-'+i+'"></td><td></td></tr></table>';
-return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
+return h+'<div class="bar"><button class="btn" data-a="add" data-p="'+p+'" data-i="'+i+'">Add a bill for '+esc(S.names[p])+'</button></div>'}
 function month(m,i){var o=!!OPEN[i];
 return'<section class="card"><button class="mh" data-a="tog" data-i="'+i+'" aria-expanded="'+o+'"><span class="ar">'+(o?'▾':'▸')+'</span><b>'+ML(m)+'</b>'+(m===CUR?'<span class="now">This month</span>':'')+'<span id="ml-'+i+'"></span></button><div class="mb"'+(o?'':' hidden')+'>'+
 P.map(function(p){return person(p,i)}).join('')+
 '<h3>Together</h3><table>'+[['Income','ci'],['Bills','ce'],['Still to pay','cp'],['Put into savings','cv'],['Left over','cl'],['Total saved so far','cs']].map(function(r){return'<tr class="'+(r[1]==='cl'?'left':'tot')+'"><td>'+r[0]+'</td><td id="'+r[1]+'-'+i+'"></td><td></td></tr>'}).join('')+'</table></div></section>'}
 function totals(){var run=+S.start||0;
-S.months.forEach(function(m,i){var ci=0,ce=0,cv=0;
+S.months.forEach(function(m,i){var ci=0,ce=0,cv=0,B=S.mb[i];
 P.forEach(function(p){var inc=+S.inc[p][i]||0,t=0,sv=+S.sav[p][i]||0;
-S.exp.forEach(function(e){if(e.o===p)t+=+e.a[i]||0});
+B.forEach(function(e){if(e.o===p)t+=+e.a||0});
 ci+=inc;ce+=t;cv+=sv;
 $('t-'+p+'-'+i).textContent=R(t);$('l-'+p+'-'+i).innerHTML=pill(inc-t-sv)});
-var cp=0;S.exp.forEach(function(e){if(!(e.p&&e.p[i]))cp+=+e.a[i]||0});$('cp-'+i).textContent=R(cp);
+var cp=0;B.forEach(function(e){if(!e.p)cp+=+e.a||0});$('cp-'+i).textContent=R(cp);
 run+=cv;
 $('ci-'+i).textContent=R(ci);$('ce-'+i).textContent=R(ce);$('cv-'+i).textContent=R(cv);
 $('cl-'+i).innerHTML=pill(ci-ce-cv);$('cs-'+i).textContent=R(run);$('ml-'+i).innerHTML=pill(ci-ce-cv)});
-S.exp.forEach(function(e,ei){var ty=btype(e);if(!ty)return;S.months.forEach(function(m,i){var a=$('sm-'+ei+'-'+i);if(a)a.textContent=sumText(e,i,ty);var b=$('pn-'+ei+'-'+i);if(b)b.innerHTML=stats(e,i,ty)})});
+S.mb.forEach(function(B,i){B.forEach(function(e,ei){var ty=btype(e);if(!ty)return;var a=$('sm-'+ei+'-'+i);if(a)a.textContent=sumText(e,ty);var b=$('pn-'+ei+'-'+i);if(b)b.innerHTML=stats(e,ty)})});
 $('tsv').textContent=R(run);drawCharts()}
 function render(){
 $('names').innerHTML=P.map(function(p){return'<div><label for="pn'+p+'">Person '+(p+1)+'’s name</label><input id="pn'+p+'" data-k="pn" data-p="'+p+'" value="'+esc(S.names[p])+'" maxlength="30"></div>'}).join('');
@@ -270,31 +285,31 @@ $('trashbox').innerHTML=TOPEN?trashHTML():'';$('tbtn').textContent='Recently del
 $('app').innerHTML=S.months.map(month).join('');KEY=orderKey();totals()}
 
 /* ---------- typing and clicking ---------- */
+function bill(t){return S.mb[+t.dataset.i][+t.dataset.e]}
 $('board').addEventListener('input',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='inc')S.inc[+t.dataset.p][+t.dataset.i]=+t.value||0;
 else if(k==='sav')S.sav[+t.dataset.p][+t.dataset.i]=+t.value||0;
 else if(k==='start')S.start=+t.value||0;
-else if(k==='ltotal'){S.exp[+t.dataset.e].total=+t.value||0;document.querySelectorAll('input[data-k="ltotal"][data-e="'+t.dataset.e+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
-else if(k==='amt')S.exp[+t.dataset.e].a[+t.dataset.i]=+t.value||0;
-else if(k==='name'){S.exp[+t.dataset.e].n=t.value;
-document.querySelectorAll('input[data-k="name"][data-e="'+t.dataset.e+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
+else if(k==='ltotal'){var lb=bill(t);S.tot[lb.id]=+t.value||0;document.querySelectorAll('input[data-k="ltotal"][data-bid="'+lb.id+'"]').forEach(function(x){if(x!==t)x.value=t.value})}
+else if(k==='amt')bill(t).a=+t.value||0;
+else if(k==='name')bill(t).n=t.value;
 else if(k==='pn'){S.names[+t.dataset.p]=t.value||('Partner '+(+t.dataset.p+1));save();return}
 else return;
 save();totals()});
 $('board').addEventListener('change',function(ev){var t=ev.target,k=t.dataset.k;
 if(k==='pn'){render()}
-else if(k==='paid'){var e3=S.exp[+t.dataset.e];if(!e3.p)e3.p=[];e3.p[+t.dataset.i]=t.checked;
+else if(k==='paid'){bill(t).p=t.checked;
 var tr=t.closest('tr');if(tr)tr.classList.toggle('paid',t.checked);save();totals()}
 else if(k==='cm'){CM=+t.value;drawCharts()}
 else if(k==='cut'){CUT=+t.value;drawCharts()}
 else if(k==='amt'){setTimeout(function(){if(orderKey()!==KEY)resort()},250)}
-else if(k==='name'){var e2=S.exp[+t.dataset.e],nm=t.value.trim();
+else if(k==='name'){var e2=bill(t),nm=t.value.trim();
 if(nm&&nm!=='Other'&&nm.length<=30){if(LIST().indexOf(nm)<0)S.list.push(nm);e2.n=nm;e2.c=false;save();render()}}
-else if(k==='owner'){S.exp[+t.dataset.e].o=+t.value;save();render()}
-else if(k==='pick'){var ei=+t.dataset.e,e=S.exp[ei];
+else if(k==='owner'){bill(t).o=+t.value;save();render()}
+else if(k==='pick'){var e=bill(t),ei=t.dataset.e,ii=t.dataset.i;
 if(t.value==='__other'){e.c=true;e.n='Other'}else{e.c=false;e.n=t.value}
 save();render();
-var el=document.querySelector('input[data-k="name"][data-e="'+ei+'"]');if(el){el.focus();el.select()}}});
+var el=document.querySelector('input[data-k="name"][data-e="'+ei+'"][data-i="'+ii+'"]');if(el){el.focus();el.select()}}});
 
 function msg(t,bad){var m=$('msg');m.textContent=t;m.style.color=bad?'var(--neg)':'var(--mut)'}
 async function login(kind){var e=$('em').value.trim(),p=$('pw').value;
@@ -314,11 +329,11 @@ if(a==='tl'){LOPEN=!LOPEN;render();return}
 if(a==='tc'){CH=!CH;drawCharts();return}
 if(a==='tt'){TOPEN=!TOPEN;render();return}
 if(a==='tr'){restoreTrash(+b.dataset.n);return}
-if(a==='tg'){var k2=b.dataset.e+'-'+b.dataset.i;EXP[k2]=!EXP[k2];render();return}
+if(a==='tg'){var k2=bill(b).id+'-'+b.dataset.i;EXP[k2]=!EXP[k2];render();return}
 if(a==='sa'){var ee=+b.dataset.e,ii=+b.dataset.i,nn=$('sn-'+ee+'-'+ii),pp=$('sp-'+ee+'-'+ii),nm2=nn.value.trim(),pv=+pp.value;
 if(!nm2){nn.focus();return}
-slist(S.exp[ee],ii).push({n:nm2,v:pv>0?pv:0});save();render();var f2=$('sn-'+ee+'-'+ii);if(f2)f2.focus();return}
-if(a==='sd'){var bl2=S.exp[+b.dataset.e],it2=slist(bl2,+b.dataset.i).splice(+b.dataset.n,1)[0];if(it2)toTrash({type:'item',bill:bl2.n,month:S.months[+b.dataset.i],it:it2});save();render();return}
+slist(S.mb[ii][ee]).push({n:nm2,v:pv>0?pv:0});save();render();var f2=$('sn-'+ee+'-'+ii);if(f2)f2.focus();return}
+if(a==='sd'){var bl2=bill(b),it2=slist(bl2).splice(+b.dataset.n,1)[0];if(it2)toTrash({type:'item',bill:bl2.n,month:S.months[+b.dataset.i],it:it2});save();render();return}
 if(a==='la'){var v=$('nl').value.trim();if(!v)return;if(LIST().indexOf(v)>=0){alert('That name is already in the list.');return}
 S.list.push(v);save();render();$('nl').focus();return}
 if(a==='lr'){var nm=LIST()[+b.dataset.n];if(!confirm('Remove “'+nm+'” from the list?'))return;toTrash({type:'name',name:nm,idx:+b.dataset.n});S.list.splice(+b.dataset.n,1);save();render();return}
@@ -326,20 +341,16 @@ if(a==='new'){newBudget();return}
 if(a==='join'){joinBudget();return}
 if(a==='out'){BID=null;sb.auth.signOut();return}
 if(a==='tog'){var k=+b.dataset.i;OPEN[k]=!OPEN[k];render();return}
-if(a==='del'){var e=S.exp[+b.dataset.e];if(!confirm('Remove “'+e.n+'”? You can get it back from Recently deleted for 35 days.'))return;toTrash({type:'bill',e:JSON.parse(JSON.stringify(e)),idx:+b.dataset.e});S.exp.splice(+b.dataset.e,1)}
-else if(a==='add'){S.exp.push({n:'Other',c:true,o:+b.dataset.p,a:S.months.map(function(){return 0})})}
+if(a==='del'){var mi0=+b.dataset.i,e=bill(b);if(!confirm('Remove “'+e.n+'” from '+ML(S.months[mi0])+'? You can get it back from Recently deleted for 35 days.'))return;toTrash({type:'bill',m:S.months[mi0],b:JSON.parse(JSON.stringify(e)),idx:+b.dataset.e});S.mb[mi0].splice(+b.dataset.e,1)}
+else if(a==='add'){S.mb[+b.dataset.i].push({id:uid(),n:'Other',c:true,o:+b.dataset.p,a:0,p:false,sl:[]})}
 else if(a==='addm'){var p=S.months[n-1].split('-');
 S.months.push(ym(new Date(+p[0],+p[1],1)));
 P.forEach(function(q){S.inc[q].push(S.inc[q][n-1]);S.sav[q].push(S.sav[q][n-1])});
-S.exp.forEach(function(e){e.a.push(e.a[n-1]);if(e.p)e.p.push(false)});
-S.exp.forEach(function(e){if(btype(e)==='loan'){if(!e.p)e.p=[];e.p[n-1]=true}});OPEN[n]=true}
+S.mb[n-1].forEach(function(e){if(btype(e)==='loan')e.p=true});
+S.mb.push(S.mb[n-1].map(function(e){return{id:e.id,n:e.n,o:e.o,a:e.a,p:false,c:e.c,sl:[]}}));OPEN[n]=true}
 else if(a==='delm'){if(n<2||!confirm('Remove '+ML(S.months[n-1])+'? You can get it back from Recently deleted.'))return;
-toTrash({type:'month',m:S.months[n-1],inc:P.map(function(q){return S.inc[q][n-1]}),sav:P.map(function(q){return S.sav[q][n-1]}),bills:S.exp.map(function(e){return{n:e.n,o:e.o,a:e.a[n-1],p:!!(e.p&&e.p[n-1]),sl:(e.sl&&e.sl[n-1])||[]}})});
-S.months.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()});S.exp.forEach(function(e){e.a.pop();if(e.p)e.p.length=Math.min(e.p.length,n-1);if(e.sl)e.sl.length=Math.min(e.sl.length,n-1)})}
-else if(a==='up'||a==='dn'){var i=+b.dataset.e,d=a==='up'?-1:1,j=i+d;
-while(j>=0&&j<S.exp.length&&S.exp[j].o!==S.exp[i].o)j+=d;
-if(j<0||j>=S.exp.length)return;
-var tmp=S.exp[i];S.exp[i]=S.exp[j];S.exp[j]=tmp}
+toTrash({type:'month',m:S.months[n-1],inc:P.map(function(q){return S.inc[q][n-1]}),sav:P.map(function(q){return S.sav[q][n-1]}),bills:JSON.parse(JSON.stringify(S.mb[n-1]))});
+S.months.pop();S.mb.pop();delete OPEN[n-1];P.forEach(function(q){S.inc[q].pop();S.sav[q].pop()})}
 else if(a==='reset'){if(!confirm('Clear everything and start with an empty budget? You can get it back from Recently deleted for 35 days.'))return;var old=JSON.parse(JSON.stringify(S)),tr0=old.trash||[];old.trash=[];S=fresh();S.trash=tr0;toTrash({type:'all',data:old});setOpen()}
 save();render()});
 document.addEventListener('keydown',function(ev){if(ev.key==='Enter'&&ev.target.id==='nl'){ev.preventDefault();var b=document.querySelector('button[data-a="la"]');if(b)b.click()}});
