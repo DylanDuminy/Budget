@@ -210,8 +210,8 @@ if(t.type==='item')return'Shopping item: '+t.it.n+' ('+R(t.it.v)+') on '+t.bill+
 if(t.type==='name')return'Bill list name: '+t.name;
 if(t.type==='month')return'Month: '+ML(t.m);
 return'Your whole budget (before Start over)'}
-function trashHTML(){purge();var h='<div class="card pad"><b>Recently deleted</b><p class="hint" style="margin:4px 0 0">Anything you delete is kept here for 35 days, then removed for good. Tap Restore to get it back.</p>';
-h+=S.trash.length?S.trash.map(function(t,k){var d=Math.floor((Date.now()-t.at)/864e5);return'<div class="li"><span>'+esc(describe(t))+' <small class="hint">· '+(d<1?'today':d+(d===1?' day ago':' days ago'))+'</small></span><button class="btn" data-a="tr" data-n="'+k+'">Restore</button></div>'}).join(''):'<p class="hint">Nothing has been deleted lately.</p>';
+function trashHTML(){purge();var h='<div class="card pad"><b>Recently deleted</b><p class="hint" style="margin:4px 0 0">Anything you delete is kept here for 35 days, then removed for good. Tap Restore to get it back, or Delete to remove it for good.</p>'+(S.trash.length?'<div class="bar" style="margin:8px 0"><button class="btn" data-a="tx">Delete all for good</button></div>':'');
+h+=S.trash.length?S.trash.map(function(t,k){var d=Math.floor((Date.now()-t.at)/864e5);return'<div class="li"><span>'+esc(describe(t))+' <small class="hint">· '+(d<1?'today':d+(d===1?' day ago':' days ago'))+'</small></span><div style="display:flex;gap:6px"><button class="btn" data-a="tr" data-n="'+k+'">Restore</button><button class="btn" data-a="tf" data-n="'+k+'" aria-label="Delete for good" title="Delete for good">Delete</button></div></div>'}).join(''):'<p class="hint">Nothing has been deleted lately.</p>';
 return h+'</div>'}
 function restoreTrash(k){var t=S.trash[k];if(!t)return;
 if(t.type==='bill'){var mi=S.months.indexOf(t.m);
@@ -330,6 +330,8 @@ if(a==='tl'){LOPEN=!LOPEN;render();return}
 if(a==='tc'){CH=!CH;drawCharts();return}
 if(a==='tt'){TOPEN=!TOPEN;render();return}
 if(a==='tr'){restoreTrash(+b.dataset.n);return}
+if(a==='tf'){var tk=+b.dataset.n;if(!confirm('Delete this for good? You will not be able to get it back.'))return;S.trash.splice(tk,1);save();render();return}
+if(a==='tx'){if(!confirm('Delete everything in Recently deleted for good? You will not be able to get any of it back.'))return;S.trash=[];save();render();return}
 if(a==='tg'){var k2=bill(b).id+'-'+b.dataset.i;EXP[k2]=!EXP[k2];render();return}
 if(a==='sa'){var ee=+b.dataset.e,ii=+b.dataset.i,nn=$('sn-'+ee+'-'+ii),pp=$('sp-'+ee+'-'+ii),nm2=nn.value.trim(),pv=+pp.value;
 if(!nm2){nn.focus();return}
